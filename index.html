@@ -30,6 +30,22 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 .btn.wareBtn{width:auto;font-size:20px;padding:4px 10px}
 .btn:disabled{opacity:.4}
 #effekte{font-size:18px;padding:2px 10px}
+#pfeile{position:absolute;inset:0;pointer-events:none}
+.pfeil{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:1px;will-change:transform}
+.pfeil .spitze{width:0;height:0;border-top:13px solid transparent;border-bottom:13px solid transparent;border-left:24px solid var(--gelb);filter:drop-shadow(2px 0 0 var(--ink)) drop-shadow(-2px 0 0 var(--ink)) drop-shadow(0 2px 0 var(--ink)) drop-shadow(0 -2px 0 var(--ink))}
+.pfeil span{font-family:'Bangers',sans-serif;font-size:16px;letter-spacing:1px;background:var(--paper);border:2px solid var(--ink);border-radius:8px;padding:0 6px;white-space:nowrap}
+.pfeil.rot .spitze{border-left-color:var(--red);animation:blink .5s infinite}
+.pfeil.rot span{color:var(--red)}
+@keyframes blink{50%{opacity:.45}}
+#countdown{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font-size:120px;color:#fff;-webkit-text-stroke:3px var(--ink);text-shadow:5px 5px 0 var(--ink);opacity:0;pointer-events:none}
+#countdown.an{animation:cd 1s forwards}
+@keyframes cd{0%{opacity:1;transform:translate(-50%,-50%) scale(1.6)}25%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.85)}}
+.statZeile{display:block;font-size:13px;opacity:.75;line-height:1}
+#endListe .n{white-space:normal}
+#auszeichnungen{text-align:left;font-size:15px;margin:6px 0 4px}
+.preis{border-top:1px dashed rgba(34,29,27,.35);padding:3px 0}
+.preis span{font-size:18px;margin-right:4px}
+.preis small{opacity:.75}
 #btnKarte{left:calc(50% + 58px);top:calc(env(safe-area-inset-top) + 10px);width:42px;height:42px;font-size:20px;background:#fff}
 #karte{position:absolute;z-index:6;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px;pointer-events:auto;text-align:center}
 #karteCv{width:min(84vmin,520px);height:min(84vmin,520px);display:block;border:2px solid var(--ink);border-radius:8px}
@@ -147,6 +163,8 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
   <div id="uhr" class="panel comic">5:00</div>
   <div id="rang" class="panel"></div>
   <div id="msg" class="comic"></div>
+  <div id="pfeile"></div>
+  <div id="countdown" class="comic"></div>
   <div id="slots"></div>
   <div id="ort" class="comic"></div>
   <button id="btnKarte" class="rund">🗺</button>
@@ -202,6 +220,7 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
     <h2>Runde vorbei!</h2>
     <div id="sieger" class="sub"></div>
     <div class="liste" id="endListe"></div>
+    <div id="auszeichnungen"></div>
     <div class="reihe" id="endHost"><button class="btn" id="bNochmal">Neue Runde</button></div>
     <div id="endWait" class="sub">Warte auf den Host …</div>
     <div class="reihe"><button class="btn grau" id="bMenu">Hauptmenü</button></div>
@@ -337,7 +356,17 @@ const gewicht = carry=>carry.reduce((s,t)=>s+ITEMS[t].gewicht,0);
    ===================================================================== */
 const H1 = KONFIG.ebeneHoehe;
 const WD = 0.35;
-const SEE = {cx:29, cz:-29, r:9.5, insel:3.6, bruecke:[19,-30.5,26,-27.5]};
+// See: unregelmäßige Uferlinie und Insel (Radius je Richtung), Brücke wird automatisch eingepasst
+const SEE = {cx:29, cz:-29, ix:29.7, iz:-29.5};
+SEE.R=a=>8.4+1.1*Math.cos(a-2.3)+0.75*Math.cos(2*a+0.7)+0.4*Math.cos(3*a+2.2)+0.35*Math.cos(4*a+0.5);
+SEE.I=a=>3.5+0.55*Math.cos(a+0.9)+0.3*Math.cos(2*a-1.3);
+SEE.imSee=(x,z,plus=0)=>Math.hypot(x-SEE.cx,z-SEE.cz)<SEE.R(Math.atan2(z-SEE.cz,x-SEE.cx))+plus;
+SEE.aufInsel=(x,z,plus=0)=>Math.hypot(x-SEE.ix,z-SEE.iz)<SEE.I(Math.atan2(z-SEE.iz,x-SEE.ix))+plus;
+SEE.rMax=10.2;
+(function(){ const z1=-30.3, z2=-27.9; let ufer=99, insel=0;
+  for(const z of [z1,(z1+z2)/2,z2]){ for(let x=10;x<40;x+=0.05) if(SEE.imSee(x,z)){ ufer=Math.min(ufer,x); break; }
+    for(let x=10;x<40;x+=0.05) if(SEE.aufInsel(x,z)){ insel=Math.max(insel,x); break; } }
+  SEE.bruecke=[ufer-0.7,z1,insel+0.5,z2]; })();
 const baum=(x,z)=>({typ:'baum',box:[x-0.5,z-0.5,x+0.5,z+0.5]});
 const fels=(x1,z1,x2,z2)=>({typ:'fels',box:[x1,z1,x2,z2]});
 // Wald: Bäume mit festem Zufall (auf allen Geräten gleich), Hochsitz und Rampe bleiben frei
@@ -368,9 +397,9 @@ const KARTE = [
   fels(-23,-31,-21,-29), fels(-32,-23,-30,-21.5),
 
   // ---- Nordosten: See mit Insel und Brücke ----
-  {typ:'see', ...SEE, box:[SEE.cx-SEE.r,SEE.cz-SEE.r,SEE.cx+SEE.r,SEE.cz+SEE.r]},
+  {typ:'see', ...SEE, box:[SEE.cx-SEE.rMax,SEE.cz-SEE.rMax,SEE.cx+SEE.rMax,SEE.cz+SEE.rMax]},
   baum(30.75,-30.75),
-  {typ:'kiste', box:[27,-28,28.2,-26.8], h:1.0},
+  {typ:'kiste', box:[31,-28.2,32.2,-27], h:1.0},
   fels(18,-36,20,-34), fels(22,-19.5,24,-18),
 
   // ---- Südwesten: Wüste mit Militärbasis ----
@@ -426,7 +455,7 @@ const KARTE = [
   {typ:'mauer', box:[-30,-1-WD,-24,-1+WD], h:2.3},
   baum(-30.25,2.75), baum(-36.25,5.75), baum(-23.25,14.25),
 ];
-const keinGras=(x,z)=>(x>19&&z>19)||Math.hypot(x-SEE.cx,z-SEE.cz)<SEE.r+0.8;
+const keinGras=(x,z)=>(x>19&&z>19)||SEE.imSee(x,z,0.9);
 
 // Bereiche (für Bodenfarbe, Kartenansicht und Ortsanzeige)
 const BEREICHE = [
@@ -524,8 +553,7 @@ const HINDERNIS=new Set(['mauer','container','auto','stapel','reifen','fass','ro
     if(k.typ==='baum'){ const bx=(k.box[0]+k.box[2])/2, bz=(k.box[1]+k.box[3])/2;
       fuelle([bx-2,bz-2,bx+2,bz+2],(c,x,z)=>{ if(Math.hypot(x-bx,z-bz)<1.9){ ueberdacht[c]=1; if(!deko[c]) deko[c]=2; } }); }
     if(k.typ==='see'){ const [b1,b2,b3,b4]=k.bruecke;
-      fuelle([k.cx-k.r,k.cz-k.r,k.cx+k.r,k.cz+k.r],(c,x,z)=>{ const d=Math.hypot(x-k.cx,z-k.cz);
-        if(d<k.r&&d>k.insel&&!(x>b1&&x<b3&&z>b2&&z<b4)){ begehbar[0][c]=0; deko[c]=1; } }); }
+      fuelle(k.box,(c,x,z)=>{ if(SEE.imSee(x,z)&&!SEE.aufInsel(x,z)&&!(x>b1&&x<b3&&z>b2&&z<b4)){ begehbar[0][c]=0; deko[c]=1; } }); }
   }
   // 3. Rampen
   for(const k of KARTE) if(k.typ==='rampe'){
@@ -673,6 +701,28 @@ function zielNahe(px,pz,rad){
   }
   return {x:px,z:pz,e:0};
 }
+// Obere Ebenen (Dächer, Plattformen, Containerblock …) als zusammenhängende Flächen
+const obenKomp=new Int16Array(NZ).fill(-1), OBEN=[];
+function baueObenFlaechen(){
+  OBEN.length=0; obenKomp.fill(-1);
+  const ok=c=>navOK[1][c]&&rampeH[c]<0;
+  for(let c0=0;c0<NZ;c0++){ if(obenKomp[c0]>=0||!ok(c0)) continue;
+    const id=OBEN.length, zellen=[], q=[c0]; obenKomp[c0]=id;
+    while(q.length){ const c=q.pop(); zellen.push(c); const i=c%GN, j=(c/GN)|0;
+      for(const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1]]){ const ni=i+di, nj=j+dj; if(ni<0||nj<0||ni>=GN||nj>=GN) continue; const n=nj*GN+ni; if(obenKomp[n]>=0||!ok(n)) continue; obenKomp[n]=id; q.push(n); } }
+    OBEN.push({zellen:zellen.filter(c=>punktFrei(zMitte(c%GN),zMitte((c/GN)|0),1,0.4))});
+  }
+}
+// Liegt auf einer oberen Fläche nichts mehr und ist niemand oben, kommt ein neues Teil dazu
+function obenNachfuellen(pop){
+  OBEN.forEach((K,id)=>{
+    if(K.zellen.length<4) return;
+    for(const it of G.items.values()) if(it.e===1&&obenKomp[zelle(it.x,it.z)]===id) return;
+    for(const p of G.spieler.values()) if((p.e||0)===1&&obenKomp[zelle(p.x,p.z)]===id) return;
+    const c=K.zellen[Math.floor(Math.random()*K.zellen.length)], x=zMitte(c%GN), z=zMitte((c/GN)|0);
+    neuesItem(zufallsTyp(x,z,1),x,z,pop,1);
+  });
+}
 let ablageZellen=null;   // freie Zellen je Etage (für Teile)
 function zufallsPunktItem(abstandSpieler=4){
   if(!ablageZellen){ ablageZellen=[[],[]]; for(let e=0;e<2;e++) for(let c=0;c<NZ;c++) if(navOK[e][c]&&rampeH[c]<0&&punktFrei(zMitte(c%GN),zMitte((c/GN)|0),e,0.4)) ablageZellen[e].push(c); }
@@ -730,7 +780,7 @@ renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false;
-const DPR = Math.min(window.devicePixelRatio||1, 1.6);
+let DPR = Math.min(window.devicePixelRatio||1, 1.6);
 renderer.setPixelRatio(DPR);
 renderer.setClearColor(0x8080ff, 1);
 
@@ -955,7 +1005,8 @@ function grasGeo(){
 })();
 
 // ---------- Karte bauen (Objekte werden je Gegenstand zu einem Mesh zusammengefasst) ----------
-const verdecker=[];   // Objekte, die durchsichtig werden, wenn sie die eigene Figur verdecken
+const verdecker=[];
+let seeWellen=null;   // Objekte, die durchsichtig werden, wenn sie die eigene Figur verdecken
 const _m4=new THREE.Matrix4(), _q=new THREE.Quaternion(), _eu=new THREE.Euler(), _sv=new THREE.Vector3(1,1,1), _pv=new THREE.Vector3();
 class Bau{
   constructor(){ this.teile=[]; }
@@ -1024,11 +1075,24 @@ function baueKarte(){
         for(let i=0;i<n;i++){ const s=-L/2+(i+0.5)*l; for(const a of [ang,-ang]){ if(lx) B.box(dl,0.03,0.03,f,cx+s,1.25,cz,0,0,a); else B.box(0.03,0.03,dl,f,cx,1.25,cz+s,0,a,0); } }
         B.fertig(null); break; }
       case 'see': {
-        const flach=(geo,farbe,y,off)=>{ const m=new THREE.Mesh(geo,new THREE.MeshToonMaterial({color:farbe,gradientMap:GRAD,polygonOffset:true,polygonOffsetFactor:off,polygonOffsetUnits:off})); m.rotation.x=-Math.PI/2; m.position.set(k.cx,y,k.cz); m.receiveShadow=true; scene.add(m); };
-        flach(new THREE.CircleGeometry(k.r+0.8,56),0xe9dcb4,0.02,-2);      // Ufer
-        flach(new THREE.CircleGeometry(k.r,56),0x9fd2e8,0.03,-3);          // Wasser
-        B.zyl(k.insel+0.25,k.insel+0.6,0.1,32,0xd6e6b2,k.cx,0.06,k.cz);   // Insel
-        for(let i=0;i<16;i++){ const a=rnd(0,6.28), r=rnd(k.insel+1.2,k.r-0.8); B.box(rnd(0.7,1.5),0.02,0.07,0xf4fbff,k.cx+Math.cos(a)*r,0.045,k.cz+Math.sin(a)*r); }
+        // Umriss als Form (Weltkoordinaten relativ zum Seemittelpunkt; nach Drehung ist Form-y = −Welt-z)
+        const form=(fn,ox,oz,plus,n=72)=>{ const sh=new THREE.Shape(); for(let i=0;i<=n;i++){ const a=i/n*Math.PI*2, r=fn(a)+plus, x=ox+Math.cos(a)*r, z=oz+Math.sin(a)*r; if(i) sh.lineTo(x,-z); else sh.moveTo(x,-z); } return sh; };
+        const flach=(geo,farbe,y,off)=>{ const m=new THREE.Mesh(geo,new THREE.MeshToonMaterial({color:farbe,gradientMap:GRAD,polygonOffset:true,polygonOffsetFactor:off,polygonOffsetUnits:off})); m.rotation.x=-Math.PI/2; m.position.set(k.cx,y,k.cz); m.receiveShadow=true; scene.add(m); return m; };
+        flach(new THREE.ShapeGeometry(form(SEE.R,0,0,0.9)),0xe9dcb4,0.022,-1);   // Sandufer
+        flach(new THREE.ShapeGeometry(form(SEE.R,0,0,0)),0x9fd2e8,0.034,-1);     // Wasser
+        flach(new THREE.ShapeGeometry(form(a=>SEE.R(a)*0.62,0,0,0)),0x8cc6df,0.046,-1); // tieferes Wasser
+        B.add(new THREE.ExtrudeGeometry(form(SEE.I,SEE.ix-k.cx,SEE.iz-k.cz,0.45),{depth:0.12,bevelEnabled:false}),0xe9dcb4,k.cx,0.0,k.cz,-Math.PI/2,0,0);
+        B.add(new THREE.ExtrudeGeometry(form(SEE.I,SEE.ix-k.cx,SEE.iz-k.cz,0.05),{depth:0.17,bevelEnabled:false}),0xc9e2a6,k.cx,0.0,k.cz,-Math.PI/2,0,0);
+        const wasserPunkt=()=>{ for(let t=0;t<40;t++){ const a=rnd(0,6.28), r=rnd(1,10), x=k.cx+Math.cos(a)*r, z=k.cz+Math.sin(a)*r; if(SEE.imSee(x,z,-0.7)&&!SEE.aufInsel(x,z,0.8)) return [x,z]; } return null; };
+        // Seerosen
+        for(let i=0;i<9;i++){ const p=wasserPunkt(); if(!p) continue; const r=rnd(0.28,0.45); B.zyl(r,r,0.02,9,zufall([0x7fb069,0x8cbf74]),p[0],0.062,p[1]); if(i%3===0) B.add(new THREE.IcosahedronGeometry(0.09,0),0xf4b6c2,p[0]+0.05,0.09,p[1]); }
+        // Schilf am Ufer
+        for(let i=0;i<14;i++){ const a=rnd(0,6.28), r=SEE.R(a)-0.25, bx=k.cx+Math.cos(a)*r, bz=k.cz+Math.sin(a)*r;
+          if(bx>SEE.bruecke[0]-1&&bx<SEE.bruecke[2]+1&&bz>SEE.bruecke[1]-1&&bz<SEE.bruecke[3]+1) continue;
+          for(let j=0;j<4;j++){ const h=rnd(0.7,1.2), x=bx+rnd(-0.3,0.3), z=bz+rnd(-0.3,0.3); B.box(0.035,h,0.035,0x5d7d45,x,h/2,z,0,rnd(-0.12,0.12),rnd(-0.12,0.12)); if(j%2===0) B.box(0.07,0.2,0.07,0x7a5a3a,x,h-0.05,z); } }
+        // Wellen (eigenes Objekt, wird animiert)
+        const W=new Bau(); for(let i=0;i<20;i++){ const p=wasserPunkt(); if(p) W.box(rnd(0.6,1.3),0.015,0.06,0xf4fbff,p[0],0.058,p[1],rnd(-0.15,0.15)); } seeWellen=W.fertig(null); if(seeWellen) fx(seeWellen);
+        // Brücke
         const [b1,b2,b3,b4]=k.bruecke, bl=b3-b1, bz=(b2+b4)/2, bb=b4-b2;
         B.box(bl+0.4,0.07,bb,0xc79b68,(b1+b3)/2,0.055,bz);
         for(let x=b1;x<=b3+0.01;x+=0.5) B.box(0.04,0.02,bb,0x8a6845,x,0.1,bz);
@@ -1475,7 +1539,7 @@ const ZST=['patrouille','pause','jagd','suche','abliefern'], DZST=['kreisen','ve
 
 function neuerSpieler(id,name,aussehen){
   // SPÄTER: Upgrades (Tempo, Rucksack, Tarnung …) verändern tempoMul / kapazitaet
-  return {id,name,aussehen,farbe:aussehen?aussehen.k:0xcccccc,fallBis:0,fallLokalBis:0,fall:false,schubsBereit:0,schubsSchutz:0,kbx:0,kbz:0,x:0,z:3,e:0,y:0,rot:0,bewegt:0,carry:[],geld:0,stunBis:0,schonBis:0,stun:false,schon:false,tempoMul:1,kapazitaet:KONFIG.rucksack,verkaufT:0,inventar:[],effBis:[0,0,0],effRest:[0,0,0]};
+  return {id,name,aussehen,farbe:aussehen?aussehen.k:0xcccccc,fallBis:0,fallLokalBis:0,fall:false,schubsBereit:0,schubsSchutz:0,kbx:0,kbz:0,x:0,z:3,e:0,y:0,rot:0,bewegt:0,carry:[],geld:0,stunBis:0,schonBis:0,stun:false,schon:false,tempoMul:1,kapazitaet:KONFIG.rucksack,verkaufT:0,stats:{teile:0,wert:0,erwischt:0,schubser:0,geklaut:0,best:-1},inventar:[],effBis:[0,0,0],effRest:[0,0,0]};
 }
 
 function neuerRoboter(i,typ='normal'){
@@ -1517,6 +1581,7 @@ function hostTick(dt){
     G.spawnT-=dt;
     if(G.spawnT<=0){ G.spawnT=KONFIG.itemSpawnAlle; if(itemsGesamt()<KONFIG.itemsMax){ const p=zufallsPunktItem(4); neuesItem(zufallsTyp(p.x,p.z,p.e),p.x,p.z,true,p.e); } }
     verkaufTick(dt);
+    G.obenT=(G.obenT||0)-dt; if(G.obenT<=0){ G.obenT=2; obenNachfuellen(true); }
   }
   for(const r of G.roboter) roboterTick(r,dt);
   for(const d of G.drohnen) drohneTick(d,dt);
@@ -1627,6 +1692,7 @@ function fangen(r,p){
   p.stunBis=G.zeit+bt; p.schonBis=G.zeit+bt+KONFIG.schonzeit;
   r.zustand='pause'; r.pauseZeit=2; r.cooldown=2.5; r.zielSpieler=null; r.entdeckung={};
   for(const o of G.roboter) if(o.zielSpieler===p.id){ o.zustand='suche'; o.suchZeit=1.5; o.zielSpieler=null; }
+  p.stats.erwischt++;
   ereignis({k:'erwischt',id:p.id,n,strafe,w:r.typ==='wuet'?1:0});
 }
 function kameraSieht(c,p){
@@ -1682,6 +1748,7 @@ function drohneTick(d,dt){
         const typ=p.carry.splice(bi,1)[0];
         d.traegt=typ; d.zustand='flucht'; d.immun[p.id]=G.zeit+5; d.lockZeit=0;
         let z=zufallsPunktDrohne(); for(let k=0;k<10&&Math.hypot(z.x-d.x,z.z-d.z)<16;k++) z=zufallsPunktDrohne(); d.ziel=z;
+        p.stats.geklaut++;
         ereignis({k:'klau',id:p.id,typ,i:d.i});
       }
       if(d.verloren>1.3){ d.zustand='kreisen'; d.ziel=null; d.lockZeit=0; }
@@ -1696,7 +1763,7 @@ function verkaufTick(dt){
   for(const p of G.spieler.values()){
     if(!p.carry.length||!inZone(p.x,p.z)||(p.e||0)!==0||G.zeit<p.stunBis){ p.verkaufT=0.15; continue; }
     p.verkaufT-=dt;
-    if(p.verkaufT<=0){ p.verkaufT=0.22; const typ=p.carry.shift(), w=ITEMS[typ].wert; p.geld+=w; ereignis({k:'verkauf',id:p.id,typ,w}); }
+    if(p.verkaufT<=0){ p.verkaufT=0.22; const typ=p.carry.shift(), w=ITEMS[typ].wert; p.geld+=w; p.stats.teile++; p.stats.wert+=w; if(p.stats.best<0||w>ITEMS[p.stats.best].wert) p.stats.best=typ; ereignis({k:'verkauf',id:p.id,typ,w}); }
   }
 }
 function aufheben(p){
@@ -1706,7 +1773,7 @@ function aufheben(p){
   if(!best) return;
   if(gewicht(p.carry)+ITEMS[best.typ].gewicht>kap(p)){ ereignis({k:'voll',id:p.id}); return; }
   G.items.delete(best.id); G.itemsDirty=true; p.carry.push(best.typ);
-  ereignis({k:'auf',id:p.id,typ:best.typ});
+  ereignis({k:'auf',id:p.id,typ:best.typ,x:r2(best.x),z:r2(best.z),e:best.e||0});
 }
 function ablegen(p){
   if(!p||G.modus!=='spiel'||!p.carry.length) return;
@@ -1735,6 +1802,7 @@ function schubsen(p){
   best.fallBis=G.zeit+stunD; best.schubsSchutz=G.zeit+stunD+KONFIG.schubsSchutz;
   let typ=-1;
   if(best.carry.length){ typ=best.carry.pop(); neuesItem(typ,best.x+ux*1.6+rnd(-0.5,0.5),best.z+uz*1.6+rnd(-0.5,0.5),true,best.e||0); }
+  p.stats.schubser++;
   ereignis({k:'schubs',id:best.id,von:p.id,ux:r2(ux),uz:r2(uz),typ,s:stunD,w:weg});
 }
 
@@ -1766,11 +1834,12 @@ function starteRunde(){
   let i=0; const n=G.spieler.size;
   for(const p of G.spieler.values()){
     const a=(i/n)*Math.PI*2+Math.PI/2; p.x=Math.cos(a)*3.1; p.z=Math.sin(a)*3.1; p.e=0; p.y=0; p.rot=Math.atan2(p.x,p.z);
-    p.carry=[]; p.geld=0; p.stunBis=0; p.schonBis=0; p.fallBis=0; p.fallLokalBis=0; p.schubsBereit=0; p.schubsSchutz=0; p.kbx=p.kbz=0; p.verkaufT=0; p.inventar=[]; p.effBis=[0,0,0]; p.effRest=[0,0,0]; i++;
+    p.carry=[]; p.geld=0; p.stunBis=0; p.schonBis=0; p.fallBis=0; p.fallLokalBis=0; p.schubsBereit=0; p.schubsSchutz=0; p.kbx=p.kbz=0; p.verkaufT=0; p.stats={teile:0,wert:0,erwischt:0,schubser:0,geklaut:0,best:-1}; p.inventar=[]; p.effBis=[0,0,0]; p.effRest=[0,0,0]; i++;
   }
   G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k)); for(let k=0;k<KONFIG.wueterichAnzahl;k++){ const r=neuerRoboter(k,'wuet'); r.i=G.roboter.length; G.roboter.push(r); }
   G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k)); G.kameras=neueKameras();
   for(let k=0;k<KONFIG.itemsMax-8;k++){ const p=zufallsPunktItem(3); neuesItem(zufallsTyp(p.x,p.z,p.e),p.x,p.z,false,p.e); }
+  obenNachfuellen(false); G.obenT=2;
   G.modus='spiel';
   if(G.online){ sendeRoster(); Netz.sendAlle(startNachricht()); sendeItems(); }
   zeigeSpiel();
@@ -1778,7 +1847,7 @@ function starteRunde(){
 function startNachricht(){ return {t:'start',dauer:G.dauer,rest:G.restzeit,p:[...G.spieler.values()].map(p=>[p.id,r2(p.x),r2(p.z),r2(p.rot)])}; }
 function endeRunde(){
   G.modus='ende';
-  const rang=[...G.spieler.values()].sort((a,b)=>b.geld-a.geld).map(p=>[p.id,p.name,p.geld,p.farbe]);
+  const rang=[...G.spieler.values()].sort((a,b)=>b.geld-a.geld).map(p=>[p.id,p.name,p.geld,p.farbe,p.stats]);
   if(G.online) Netz.sendAlle({t:'ende',rang});
   zeigeEnde(rang);
 }
@@ -1799,14 +1868,21 @@ function lokalesEreignis(e){
       if(!me || Math.hypot(me.x-x,me.z-z)<24) Sound.alarm();
       break; }
     case 'erwischt':
+      if(view) staubBurst(view.position.x,view.userData.baseY||0,view.position.z,12,0.4);
       if(istIch){ zeigeMsg(e.w?'WÜTERICH!':'ERWISCHT!', 'rot', e.n?`${e.w?'Der Wüterich':'Roboter'} kassiert ${e.n} Teil${e.n>1?'e':''} ein`:''); Sound.erwischt(); wackeln=0.5; if(navigator.vibrate) navigator.vibrate(200); }
       else if(view) popup(view.position, 'erwischt!', 'rot');
       break;
     case 'verkauf':
-      if(view) popup(view.position, `+${e.w} $`);
+      if(view){ popup(view.position, `+${e.w} $`);
+        const m=makeItemMesh(e.typ); m.scale.multiplyScalar(0.55);
+        fliege(m,new THREE.Vector3(view.position.x,(view.userData.baseY||0)+1.4,view.position.z),new THREE.Vector3(0,1.55,0),0.42,1.4,()=>funken(0,2.2,0,e.w>=80?10:5)); }
       if(istIch){ Sound.verkauf(); const g=document.getElementById('geld'); g.classList.remove('plus'); void g.offsetWidth; g.classList.add('plus'); }
       break;
-    case 'auf': if(istIch) Sound.aufheben(); break;
+    case 'auf':
+      if(istIch) Sound.aufheben();
+      if(view&&e.x!==undefined){ const m=makeItemMesh(e.typ); m.scale.multiplyScalar(0.6); const y0=(e.e||0)*H1;
+        fliege(m,new THREE.Vector3(e.x,y0+0.1,e.z),new THREE.Vector3(view.position.x,(view.userData.baseY||0)+1.3,view.position.z),0.24,0.9,null); puff(e.x,y0+0.1,e.z,0.22,0.4); }
+      break;
     case 'ab': if(istIch) Sound.ablegen(); break;
     case 'voll': if(istIch){ zeigeMsg('Rucksack voll!','gelb','',1.1); Sound.voll(); } break;
     case 'klau':
@@ -1830,6 +1906,7 @@ function lokalesEreignis(e){
     case 'luft': { const v=VIEWS.spieler.get(e.id); if(v) v.userData.schubsT=0.3; if(istIch) Sound.luft(); break; }
     case 'schubs': {
       const vv=VIEWS.spieler.get(e.von); if(vv) vv.userData.schubsT=0.3;
+      if(view) staubBurst(view.position.x,view.userData.baseY||0,view.position.z,9,0.3);
       const tp=G.spieler.get(e.id); if(tp) tp.rot=Math.atan2(e.ux,e.uz);   // fällt in Schubsrichtung
       if(view) view.rotation.y=Math.atan2(e.ux,e.uz);
       if(istIch && me){
@@ -2090,6 +2167,29 @@ function updatePopups(dt){
     setzeLabel(p.el,p.x,p.y,p.z); p.el.style.opacity=String(clamp(1.6-p.t*1.3,0,1));
     if(p.t>1.3){ p.el.remove(); popups.splice(i,1); } }
 }
+// ---------- Effekte: Staubwolken, Funken, fliegende Teile ----------
+const PUFF_GEO=new THREE.IcosahedronGeometry(1,0);
+const puffMat=new THREE.MeshToonMaterial({color:0xf5efe4,gradientMap:GRAD}), goldMat=new THREE.MeshToonMaterial({color:0xffd23f,gradientMap:GRAD});
+const puffs=[];
+function puff(x,y,z,gr=0.18,dauer=0.5,mat=puffMat,vx=0,vy=0.6,vz=0){
+  let p=null; for(const q of puffs) if(!q.m.visible&&q.m.material===mat){ p=q; break; }
+  if(!p){ if(puffs.length>160) return; const m=new THREE.Mesh(PUFF_GEO,mat); m.visible=false; scene.add(m); p={m}; puffs.push(p); }
+  Object.assign(p,{t:0,dauer,gr,vx,vy,vz}); p.m.position.set(x,y,z); p.m.rotation.set(rnd(0,3),rnd(0,3),0); p.m.scale.setScalar(0.001); p.m.visible=true;
+}
+function staubBurst(x,y,z,n=9,gr=0.32){ for(let i=0;i<n;i++){ const a=i/n*6.28+rnd(-0.3,0.3), v=rnd(1.4,2.6); puff(x+Math.cos(a)*0.3,y+0.15,z+Math.sin(a)*0.3,gr*rnd(0.7,1.2),rnd(0.5,0.8),puffMat,Math.cos(a)*v,rnd(0.3,1.1),Math.sin(a)*v); } }
+function funken(x,y,z,n=6){ for(let i=0;i<n;i++) puff(x,y,z,rnd(0.07,0.12),rnd(0.45,0.7),goldMat,rnd(-1.6,1.6),rnd(1.8,3.2),rnd(-1.6,1.6)); }
+const flieger=[];
+function fliege(mesh,von,nach,dauer,bogen,ende){ mesh.position.copy(von); scene.add(mesh); flieger.push({mesh,von:von.clone(),nach:nach.clone(),t:0,dauer,bogen,ende}); }
+function updateEffekte(dt){
+  for(const p of puffs){ if(!p.m.visible) continue; p.t+=dt; const k=p.t/p.dauer; if(k>=1){ p.m.visible=false; continue; }
+    p.m.position.x+=p.vx*dt; p.m.position.y+=p.vy*dt; p.m.position.z+=p.vz*dt; const f=Math.pow(0.05,dt); p.vx*=f; p.vz*=f; if(p.m.material===goldMat) p.vy-=9*dt;
+    p.m.scale.setScalar(p.gr*Math.sin(Math.min(1,k*2.2)*Math.PI*0.5)*(1-k*k)+0.001); }
+  for(let i=flieger.length-1;i>=0;i--){ const f=flieger[i]; f.t+=dt; const k=Math.min(1,f.t/f.dauer);
+    f.mesh.position.lerpVectors(f.von,f.nach,k); f.mesh.position.y+=Math.sin(k*Math.PI)*f.bogen; f.mesh.rotation.y+=dt*9;
+    if(k>=1){ scene.remove(f.mesh); flieger.splice(i,1); if(f.ende) f.ende(); } }
+  if(seeWellen){ seeWellen.position.x=Math.sin(uhr*0.55)*0.3; seeWellen.position.z=Math.cos(uhr*0.42)*0.18; }
+}
+
 // Markierung des nächsten Teils
 const GLITZER_GEO=new THREE.OctahedronGeometry(0.13,0), GLITZER_MAT=new THREE.MeshBasicMaterial({color:0xffd23f});
 const markRing=fx(new THREE.Mesh(new THREE.RingGeometry(0.55,0.7,36), new THREE.MeshBasicMaterial({color:0xffe27a,transparent:true,opacity:0.95,depthWrite:false})));
@@ -2152,6 +2252,9 @@ function syncViews(dt,uhr){
     ud.skal=lerp(ud.skal,aktiv(p,2)?1.22:1,kSmooth(dt,8)); v.scale.setScalar(ud.skal);
     const effTxt=(aktiv(p,1)?'⚡':'')+(aktiv(p,2)?'💪':'')+(lokal&&unsicht?'👻':'');
     if(ud.effL.textContent!==effTxt) ud.effL.textContent=effTxt;
+    // Staubwölkchen beim Laufen
+    ud.staubT=(ud.staubT||0)-dt;
+    if(lauf&&!versteckt&&ud.staubT<=0&&G.modus!=='menu'){ ud.staubT=aktiv(p,1)?0.08:0.16; puff(v.position.x-Math.sin(v.rotation.y)*0.3+rnd(-0.12,0.12),ud.baseY+0.08,v.position.z-Math.cos(v.rotation.y)*0.3+rnd(-0.12,0.12),rnd(0.1,0.17),0.45,puffMat,0,0.5,0); }
     // getragene Teile auf dem Rucksack
     const key=p.carry.join(',');
     if(key!==ud.carryKey){
@@ -2214,6 +2317,7 @@ function syncViews(dt,uhr){
     { const T=r.T||ROBOTER_TYPEN.normal; updateKegel(ud.kegel,v.position.x+Math.sin(blick)*0.35,v.position.z+Math.cos(blick)*0.35,blick,r.e||0,v.position.y,T.sicht,T.winkel); }
     const u=ud.kegel.material.uniforms; u.uZeit.value=uhr;
     const jagd=r.zustand==='jagd', suche=r.zustand==='suche';
+    ud.staubT=(ud.staubT||0)-dt; if(jagd&&ud.staubT<=0){ ud.staubT=r.typ==='wuet'?0.07:0.12; for(const sd of [-0.4,0.4]) puff(v.position.x-Math.sin(v.rotation.y)*0.5+Math.cos(v.rotation.y)*sd,v.position.y+0.08,v.position.z-Math.cos(v.rotation.y)*0.5-Math.sin(v.rotation.y)*sd,rnd(0.12,0.2),0.5,puffMat,0,0.6,0); }
     u.uAlpha.value = jagd ? 0.42+Math.sin(uhr*12)*0.08 : suche ? 0.34 : (r.zustand==='pause'&&G.modus==='spiel'?0.26:0.27);
     if(ud.auge) ud.auge.color.setHex(jagd&&Math.floor(uhr*8)%2?0xffd23f:0xff3b30);
     if(ud.antMat) ud.antMat.color.setHex(jagd ? (Math.floor(uhr*8)%2?0xffd23f:0xff2b22) : (Math.floor(uhr*1.6+i*0.37)%2?0xff2b22:0x55100c));
@@ -2341,7 +2445,8 @@ function updateHud(dt){
   $('geld').textContent=me.geld+' $';
   const s=Math.max(0,Math.ceil(G.restzeit)); $('uhr').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
   $('uhr').classList.toggle('knapp',s<=30);
-  if(s<=10 && s>0 && s!==updateHud.tick){ updateHud.tick=s; Sound.tick(); }
+  if(s<=10 && s>0 && s!==updateHud.tick){ updateHud.tick=s; Sound.tick();
+    if(s<=5){ const cd=$('countdown'); cd.textContent=s; cd.classList.remove('an'); void cd.offsetWidth; cd.classList.add('an'); } }
   // Rangliste
   const rang=[...G.spieler.values()].sort((a,b)=>b.geld-a.geld).slice(0,5);
   const rk=rang.map(p=>p.id+p.geld+p.name).join('|');
@@ -2455,12 +2560,34 @@ $('btnKarte').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopProp
 $('karte').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); karteZu(); });
 let ortName='', ortT=0;
 
+const pfeilPool=[];
+function pfeilEl(i){ let el=pfeilPool[i]; if(!el){ el=document.createElement('div'); el.className='pfeil'; el.innerHTML='<div class="spitze"></div><span></span>'; $('pfeile').appendChild(el); pfeilPool[i]=el; } return el; }
+function setzePfeil(i,x,y,z,cls,txt){
+  _v.set(x,y,z).project(camera); let px=_v.x, py=_v.y;
+  if(_v.z>1){ px=-px; py=-py; } else if(Math.abs(px)<0.9&&Math.abs(py)<0.85) return false;
+  const ang=Math.atan2(py*SH,px*SW), mx=0.86, my=SW<SH?0.72:0.68, m=Math.max(Math.abs(px)/mx,Math.abs(py)/my); px/=m; py/=m;
+  const el=pfeilEl(i); el.className='pfeil '+cls; el.style.display='';
+  el.style.transform=`translate(${(px*0.5+0.5)*SW}px,${(-py*0.5+0.5)*SH}px) translate(-50%,-50%)`;
+  el.firstChild.style.transform=`rotate(${-ang}rad)`; const sp=el.lastChild; if(sp.textContent!==txt) sp.textContent=txt;
+  return true;
+}
+function updatePfeile(){
+  let n=0; const me=ich();
+  if(G.modus==='spiel'&&me){
+    if(me.carry.length&&!inZone(me.x,me.z)&&setzePfeil(n,0,1,0,'gold','$ '+Math.round(Math.hypot(me.x,me.z))+' m')) n++;
+    for(const r of G.roboter){ if(n>=4) break; if(r.zustand!=='jagd') continue; const d=Math.hypot(r.x-me.x,r.z-me.z); if(d>24) continue;
+      if(setzePfeil(n,r.x,(r.y||0)+1,r.z,'rot',r.typ==='wuet'?'!!':'!')) n++; }
+  }
+  for(let i=n;i<pfeilPool.length;i++) if(pfeilPool[i].style.display!=='none') pfeilPool[i].style.display='none';
+}
+
 function zeigeSpiel(){
   zeigeScreen(null); updateHud.rk=updateHud.ck=updateHud.ik=null; ladenZu(); karteZu(); rauch.bis=0; ortName='';
   const me=ich(); if(me){ kam.x=me.x; kam.z=me.z; }
   zeigeMsg('LOS GEHT\'S!','gelb','Bring Schrott zum Ankauf',1.8); Sound.start();
   setTimeout(()=>{ const t=$('tipp'); if(t) t.style.opacity='0'; },9000);
 }
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function listeFuellen(el,spieler,mitGeld){
   el.innerHTML='';
   spieler.forEach((p,i)=>{
@@ -2469,6 +2596,7 @@ function listeFuellen(el,spieler,mitGeld){
     const d=document.createElement('span'); d.className='dot'; d.style.background=hex(p.farbe);
     const n=document.createElement('span'); n.className='n'; n.style.maxWidth='none'; n.textContent=p.name+(p.id==='host'?' (Host)':'');
     z.append(d,n);
+    if(mitGeld&&p.stats){ const st=document.createElement('small'); st.className='statZeile'; st.textContent=`${p.stats.teile||0} Teile · ${p.stats.erwischt||0}× erwischt`; n.appendChild(st); }
     if(mitGeld){ const g=document.createElement('span'); g.className='geldTxt'; g.textContent=p.geld+' $'; z.appendChild(g); }
     el.appendChild(z);
   });
@@ -2486,11 +2614,18 @@ function zeigeLobby(){
 function zeigeEnde(rang){
   ladenZu(); karteZu(); rauch.bis=0;
   Sound.ende();
-  const liste=rang.map(([id,name,geld,farbe])=>({id,name,geld,farbe}));
+  const liste=rang.map(([id,name,geld,farbe,stats])=>({id,name,geld,farbe,stats:stats||{}}));
   zeigeScreen('ende');
   const s=liste[0];
   $('sieger').textContent = !s ? '' : (s.id===G.meineId ? 'Du hast gewonnen! 🎉' : `${s.name} gewinnt mit ${s.geld} $!`);
   listeFuellen($('endListe'),liste,true);
+  // Auszeichnungen
+  const preis=(icon,titel,feld,txt)=>{ let b=null; for(const p of liste) if((p.stats[feld]||0)>0&&(!b||p.stats[feld]>b.stats[feld])) b=p; return b?`<div class="preis"><span>${icon}</span><b>${titel}</b> ${esc(b.name)} <small>${txt(b)}</small></div>`:''; };
+  $('auszeichnungen').innerHTML=
+    preis('🕵️','Meisterdieb','teile',b=>b.stats.teile+' Teile verkauft')+
+    preis('💎','Dickster Fang','best',b=>{ const I=ITEMS[b.stats.best]; return I?I.name+' ('+I.wert+' $)':''; })+
+    preis('💥','Rüpel','schubser',b=>b.stats.schubser+'× geschubst')+
+    preis('🤕','Pechvogel','erwischt',b=>b.stats.erwischt+'× erwischt');
   $('endHost').classList.toggle('hidden',!G.istHost);
   $('endWait').classList.toggle('hidden',G.istHost);
   joy.aktiv=false; joyBase.classList.remove('an');
@@ -2576,13 +2711,20 @@ function schleife(t){
   leseEingabe();
   for(let i=0;i<schritte;i++) simSchritt(dt);
   syncViews(echt,uhr);
+  updateEffekte(echt);
   updateKamera(echt);
+  updatePfeile();
   updatePopups(echt);
   hudT+=echt; if(hudT>0.08){ updateHud(hudT); hudT=0; }
   postMat.uniforms.zeit.value=Math.floor(uhr*8)/8;
   zeichneRauch(echt);
   render();
+  // Leistung beobachten: unter ~38 FPS Auflösung senken, sehr langsam → kleinere Schattenkarte
+  if(G.modus==='spiel'){ perf.t+=echt; perf.n++; if(perf.t>=3){ const fps=perf.n/perf.t; perf.t=0; perf.n=0; perf.mess++;
+    if(perf.mess>1&&fps<38){ if(DPR>0.9){ DPR=Math.max(0.85,DPR-0.2); renderer.setPixelRatio(DPR); resize(); }
+      else if(sonne.shadow.mapSize.x>1024){ sonne.shadow.mapSize.set(1024,1024); if(sonne.shadow.map){ sonne.shadow.map.dispose(); sonne.shadow.map=null; } } } } }
 }
+const perf={t:0,n:0,mess:0};
 function simSchritt(dt){
   if(G.modus==='spiel'){
     lokalBewegen(dt);
@@ -2607,6 +2749,7 @@ Promise.all([ladeAssets(), Promise.race([document.fonts?document.fonts.ready:Pro
   baueStation();
   baueKarte();
   baueNav();
+  baueObenFlaechen();
   $('dauerStart').appendChild($('dauerBlock'));
   starteDemo();
   zeigeScreen('start');
