@@ -177,7 +177,7 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
     <div class="reihe"><input id="codeIn" maxlength="4" placeholder="CODE" autocomplete="off"><button class="btn rosa" id="bJoin">Beitreten</button></div>
     <div id="status"></div>
     <div class="hilfe">
-      <b>Steuerung:</b> Handy: links ziehen = laufen, Knopf rechts = aufheben, Zwei-Finger-Zoom. PC: WASD/Pfeile, E/Leertaste = aufheben, F = schubsen, Q = ablegen, Mausrad = Zoom.<br><b>Kameras:</b> Orange Kegel = Überwachungskameras. Sie fangen dich nicht, schlagen aber Alarm und rufen Roboter und Drohnen herbei.<br><b>Karte:</b> Je weiter weg von der Mitte – und oben auf Dächern, Containern und Gerüsten –, desto wertvoller die Beute. Unter Dächern und Gerüsten sehen dich Drohnen nicht. 🗺 bzw. M zeigt die Karte.<br><b>Laden:</b> Am Ankauf kannst du mit deinem Geld Fähigkeiten kaufen (Unsichtbarkeit, Rauchwolke, Turbo, Muskelkraft) und sie später einsetzen (PC: 1–3, B = Laden). Ausgegebenes Geld zählt nicht mehr zum Sieg!<br><b>Schubsen:</b> Wer geschubst wird, fällt kurz hin und verliert ein Teil – Roboter können ihn dann schnappen!<br>
+      <b>Steuerung:</b> Handy: links ziehen = laufen, Knopf rechts = aufheben, Zwei-Finger-Zoom. PC: WASD/Pfeile, E/Leertaste = aufheben, F = schubsen, Q = ablegen, Mausrad = Zoom.<br><b>Wüterich:</b> Selten, schneller als du und betäubt länger – sieht aber nur ganz kurz. Halt Abstand!<br><b>Kameras:</b> Orange Kegel = Überwachungskameras. Sie fangen dich nicht, schlagen aber Alarm und rufen Roboter und Drohnen herbei.<br><b>Karte:</b> Je weiter weg von der Mitte – und oben auf Dächern, Containern und Gerüsten –, desto wertvoller die Beute. Unter Dächern und Gerüsten sehen dich Drohnen nicht. 🗺 bzw. M zeigt die Karte.<br><b>Laden:</b> Am Ankauf kannst du mit deinem Geld Fähigkeiten kaufen (Unsichtbarkeit, Rauchwolke, Turbo, Muskelkraft) und sie später einsetzen (PC: 1–3, B = Laden). Ausgegebenes Geld zählt nicht mehr zum Sieg!<br><b>Schubsen:</b> Wer geschubst wird, fällt kurz hin und verliert ein Teil – Roboter können ihn dann schnappen!<br>
       <b>Gefahren:</b> Rote Kegel = Sicht der Roboter. Rote Kreise = Drohnen-Scanner – bleibst du drin, klaut die Drohne dein wertvollstes Teil. Erwischt dich ein Roboter, verlierst du alles, was du trägst. Hinter Wänden sehen dich Roboter nicht – Drohnen fliegen aber drüber. In der Ankauf-Zone bist du sicher.
     </div>
   </div>
@@ -237,6 +237,7 @@ const KONFIG = {
   sichtWeite: 9.5,
   sichtWinkel: 34,         // halber Öffnungswinkel in Grad
   fangRadius: 1.0,
+  wueterichAnzahl: 2,      // seltene Spezial-Roboter (Flos Modell): schneller, stärker, aber kurze Sicht
   betaeubung: 1.6,         // Sekunden gelähmt nach dem Erwischtwerden
   schonzeit: 4,            // danach so lange unsichtbar für Wächter
   drohnenAnzahl: 4,
@@ -285,9 +286,9 @@ const ITEMS = [
    Modelle schauen in +Z-Richtung, 1 Einheit = 1 Meter, Ursprung am Boden.
    Roboter: ein Knoten namens "Kopf" dreht sich mit dem Blick. Drohne: Knoten "Rotor…" drehen sich. */
 const ASSETS = {
-  spieler: null, roboter: '#modell-roboter', drohne: null, station: null,   // '#…' = in dieser Datei eingebettet
+  spieler: null, roboter: null, wueterich: '#modell-roboter', drohne: null, station: null,   // '#…' = in dieser Datei eingebettet
   items: { schraube:null, dose:null, zahnrad:null, rohr:null, batterie:null, kanister:null, kupfer:null, motor:null, platine:null, roboterkopf:null },
-  skalierung: { spieler:1, roboter:0.85, drohne:1, station:1, items:1 },
+  skalierung: { spieler:1, roboter:1, wueterich:0.85, drohne:1, station:1, items:1 },
   toonUmwandeln: true      // Materialien eigener Modelle automatisch in den Zeichenstil umwandeln
 };
 
@@ -442,6 +443,12 @@ const KAMERAS = [
   {x:-39,z:10,e:0,dir:1.571,schwenk:0.8},       // Fasslager
 ];
 const KAMERA_WEITE=11, KAMERA_WINKEL=24*Math.PI/180;
+// Robotertypen: normal = Standard-Wächter, wuet = „Wüterich“ (selten, schnell, stark, kurzes Radar, großes Revier)
+const ROBOTER_TYPEN = {
+  normal:{ tempoPat:KONFIG.roboterTempoPatrouille, tempoSuche:KONFIG.roboterTempoSuche, tempoJagd:KONFIG.roboterTempoJagd, sicht:KONFIG.sichtWeite, winkel:KONFIG.sichtWinkel*Math.PI/180, fang:KONFIG.fangRadius, betaeubung:KONFIG.betaeubung, revier:12, verloren:2.2, merken:1 },
+  wuet:  { tempoPat:3.4, tempoSuche:4.6, tempoJagd:6.3, sicht:5.2, winkel:44*Math.PI/180, fang:1.3, betaeubung:2.8, revier:26, verloren:3.5, merken:2.2 },
+};
+const WUETERICH_POSTEN=[{x:30,z:-10,e:0},{x:-28,z:22,e:0},{x:-10,z:30,e:0},{x:14,z:-30,e:0}];
 // Wachposten der Roboter (Startpunkt + Revier, e = Etage)
 const ROBOTER_POSTEN = [
   {x:0,z:-15,e:0},{x:0,z:15,e:0},{x:24,z:-30,e:0},{x:33,z:-31,e:1},{x:29,z:28.2,e:0},
@@ -1157,12 +1164,16 @@ function klonModell(key, itemKey){
 }
 async function ladeAssets(){
   const liste=[];
-  for(const k of ['spieler','roboter','drohne','station']) if(ASSETS[k]) liste.push([k,ASSETS[k]]);
+  for(const k of ['spieler','roboter','wueterich','drohne','station']) if(ASSETS[k]) liste.push([k,ASSETS[k]]);
   for(const [k,v] of Object.entries(ASSETS.items)) if(v) liste.push(['item_'+k,v]);
   if(!liste.length) return;
   const loader=new GLTFLoader();
-  const aufloesen=url=>{ if(!url.startsWith('#')) return url; const el=document.querySelector(url); return el?'data:model/gltf-binary;base64,'+el.textContent.replace(/\s+/g,''):url; };
-  await Promise.all(liste.map(([k,url])=>loader.loadAsync(aufloesen(url)).then(g=>{ toonisiere(g.scene); VORLAGEN[k]=g.scene; }).catch(e=>console.warn('Asset fehlt:',url,e))));
+  // Eingebettete Modelle direkt aus dem Base64-Text lesen (ohne fetch – funktioniert überall)
+  const lade=url=>{ if(!url.startsWith('#')) return loader.loadAsync(url);
+    const el=document.querySelector(url); if(!el) return Promise.reject(new Error('nicht eingebettet'));
+    const bin=atob(el.textContent.replace(/\s+/g,'')), buf=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
+    return loader.parseAsync(buf.buffer,''); };
+  await Promise.all(liste.map(([k,url])=>lade(url).then(g=>{ toonisiere(g.scene); VORLAGEN[k]=g.scene; }).catch(e=>console.warn('Asset fehlt:',url,e))));
 }
 
 const GEO = {
@@ -1224,10 +1235,11 @@ function makeSpielerMesh(a){
   schatten(g); return g;
 }
 
-function makeRoboterMesh(){
+function makeRoboterMesh(typ='normal'){
   const g=new THREE.Group();
-  if(VORLAGEN.roboter){
-    const m=klonModell('roboter'); g.add(m);
+  const modell=typ==='wuet'?(VORLAGEN.wueterich?'wueterich':null):(VORLAGEN.roboter?'roboter':null);
+  if(modell){
+    const m=klonModell(modell); g.add(m);
     // Antennen bekommen ein eigenes, blinkendes Leuchtmaterial (je Roboter)
     const antMat=new THREE.MeshBasicMaterial({color:0xff2b22}); let antennen=0;
     m.traverse(o=>{ if(o.isMesh&&/^Antenne/i.test(o.name)){ o.material=antMat; antennen++; } });
@@ -1409,10 +1421,10 @@ function neuerSpieler(id,name,aussehen){
   return {id,name,aussehen,farbe:aussehen?aussehen.k:0xcccccc,fallBis:0,fallLokalBis:0,fall:false,schubsBereit:0,schubsSchutz:0,kbx:0,kbz:0,x:0,z:3,e:0,y:0,rot:0,bewegt:0,carry:[],geld:0,stunBis:0,schonBis:0,stun:false,schon:false,tempoMul:1,kapazitaet:KONFIG.rucksack,verkaufT:0,inventar:[],effBis:[0,0,0],effRest:[0,0,0]};
 }
 
-function neuerRoboter(i){
-  const post=ROBOTER_POSTEN[i%ROBOTER_POSTEN.length];
+function neuerRoboter(i,typ='normal'){
+  const post=typ==='wuet'?WUETERICH_POSTEN[i%WUETERICH_POSTEN.length]:ROBOTER_POSTEN[i%ROBOTER_POSTEN.length], T=ROBOTER_TYPEN[typ];
   const o={x:post.x+rnd(-0.5,0.5),z:post.z+rnd(-0.5,0.5),e:post.e}; sichern(o,0.5);
-  return {i,x:o.x,z:o.z,e:o.e,y:o.y,heim:post,rot:rnd(0,6.28),kopf:0,zustand:'patrouille',ziel:zielNahe(post.x,post.z,12),zielSpieler:null,verloren:0,suchZeit:0,pauseZeit:0,entdeckung:{},cooldown:0,alarmBis:0,phase:rnd(0,6)};
+  return {i,typ,T,x:o.x,z:o.z,e:o.e,y:o.y,heim:post,rot:rnd(0,6.28),kopf:0,zustand:'patrouille',ziel:zielNahe(post.x,post.z,T.revier),zielSpieler:null,verloren:0,suchZeit:0,pauseZeit:0,entdeckung:{},cooldown:0,alarmBis:0,phase:rnd(0,6)};
 }
 function neueKameras(){ return KAMERAS.map((k,i)=>({i,x:k.x,z:k.z,e:k.e,basis:k.dir,schwenk:k.schwenk,ang:k.dir,phase:rnd(0,6),entdeckung:{},alarmT:0,cool:0})); }
 function neueDrohne(i){
@@ -1462,9 +1474,10 @@ function hostTick(dt){
 function sieht(r,p){
   if((p.e||0)!==r.e||Math.abs((p.y||0)-(r.y||0))>1.2) return false;
   const dx=p.x-r.x, dz=p.z-r.z, d=Math.hypot(dx,dz);
-  if(d>KONFIG.sichtWeite) return false; if(d<0.3) return true;
+  const T=r.T||ROBOTER_TYPEN.normal;
+  if(d>T.sicht) return false; if(d<0.3) return true;
   const blick=r.rot+r.kopf, cos=(dx*Math.sin(blick)+dz*Math.cos(blick))/d;
-  if(cos<Math.cos(KONFIG.sichtWinkel*Math.PI/180)) return false;
+  if(cos<Math.cos(T.winkel)) return false;
   return strahl(r.e,r.x,r.z,dx/d,dz/d,d) >= d-0.35;
 }
 function bewegeZu(o,tx,tz,te,tempo,dt,dreh=5){
@@ -1497,7 +1510,7 @@ function roboterTick(r,dt){
     if(!zielbar(p)){ r.entdeckung[p.id]=0; continue; }
     if(sieht(r,p)){
       const d=Math.hypot(p.x-r.x,p.z-r.z);
-      r.entdeckung[p.id]=(r.entdeckung[p.id]||0)+dt*(1.9-1.3*d/KONFIG.sichtWeite)*(r.zustand==='jagd'||r.zustand==='suche'?3:1);
+      r.entdeckung[p.id]=(r.entdeckung[p.id]||0)+dt*(1.9-1.3*d/r.T.sicht)*(r.zustand==='jagd'||r.zustand==='suche'?3:1)*(r.typ==='wuet'?1.6:1);
       if(r.entdeckung[p.id]>=0.38 && d<best){ best=d; gesehen=p; }
     } else r.entdeckung[p.id]=Math.max(0,(r.entdeckung[p.id]||0)-dt*0.6);
   }
@@ -1509,29 +1522,29 @@ function roboterTick(r,dt){
   switch(r.zustand){
     case 'patrouille':
       r.kopf=Math.sin(t*0.9)*0.55; r.patT=(r.patT||0)+dt;
-      if(bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,KONFIG.roboterTempoPatrouille,dt,3)<0.6 || r.patT>30){ r.zustand='pause'; r.pauseZeit=rnd(1,2.4); r.patT=0; }
+      if(bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,r.T.tempoPat,dt,3)<0.6 || r.patT>30){ r.zustand='pause'; r.pauseZeit=rnd(1,2.4); r.patT=0; }
       break;
     case 'pause':
       r.kopf=Math.sin(t*1.6)*0.95;
-      r.pauseZeit-=dt; if(r.pauseZeit<=0){ if((r.beute||[]).length){ r.zustand='abliefern'; r.ziel={x:r.heim.x,z:r.heim.z,e:r.heim.e}; } else { r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,12); } }
+      r.pauseZeit-=dt; if(r.pauseZeit<=0){ if((r.beute||[]).length){ r.zustand='abliefern'; r.ziel={x:r.heim.x,z:r.heim.z,e:r.heim.e}; } else { r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,r.T.revier); } }
       break;
     case 'abliefern':
       r.kopf=Math.sin(t*0.9)*0.4;
-      if(bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,KONFIG.roboterTempoPatrouille,dt,3)<1.2) beuteAbladen(r);
+      if(bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,r.T.tempoPat,dt,3)<1.2) beuteAbladen(r);
       break;
     case 'jagd': {
       r.kopf*=Math.pow(0.02,dt);
       const p=G.spieler.get(r.zielSpieler);
       if(!p||!zielbar(p)){ r.zustand='suche'; r.suchZeit=3.5; break; }
       if(gesehen===p || r.alarmBis>G.zeit){ r.ziel={x:p.x,z:p.z,e:p.e||0}; r.verloren=0; } else r.verloren+=dt;
-      bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,KONFIG.roboterTempoJagd,dt,7);
-      if(Math.hypot(p.x-r.x,p.z-r.z)<KONFIG.fangRadius&&Math.abs((p.y||0)-r.y)<1){ fangen(r,p); break; }
-      if(r.verloren>2.2){ r.zustand='suche'; r.suchZeit=4; }
+      bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,r.T.tempoJagd,dt,7);
+      if(Math.hypot(p.x-r.x,p.z-r.z)<r.T.fang&&Math.abs((p.y||0)-r.y)<1){ fangen(r,p); break; }
+      if(r.verloren>r.T.verloren){ r.zustand='suche'; r.suchZeit=4*r.T.merken; }
       break; }
     case 'suche': {
-      const d=bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,KONFIG.roboterTempoSuche,dt,5);
+      const d=bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,r.T.tempoSuche,dt,5);
       if(d<1.3){ r.kopf=Math.sin(t*2.6)*1.1; r.suchZeit-=dt; } else r.suchZeit-=dt*0.3;
-      if(r.suchZeit<=0){ if((r.beute||[]).length){ r.zustand='abliefern'; r.ziel={x:r.heim.x,z:r.heim.z,e:r.heim.e}; } else { r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,12); } }
+      if(r.suchZeit<=0){ if((r.beute||[]).length){ r.zustand='abliefern'; r.ziel={x:r.heim.x,z:r.heim.z,e:r.heim.e}; } else { r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,r.T.revier); } }
       break; }
   }
   // Notausgang: steckt der Roboter fest, neu planen – und notfalls ein anderes Ziel nehmen
@@ -1553,10 +1566,11 @@ function fangen(r,p){
   r.beute=(r.beute||[]).concat(p.carry);
   p.carry=[];
   let strafe=0; if(KONFIG.strafeProzent>0){ strafe=Math.floor(p.geld*KONFIG.strafeProzent/100); p.geld-=strafe; }
-  p.stunBis=G.zeit+KONFIG.betaeubung; p.schonBis=G.zeit+KONFIG.betaeubung+KONFIG.schonzeit;
+  const bt=(r.T||ROBOTER_TYPEN.normal).betaeubung;
+  p.stunBis=G.zeit+bt; p.schonBis=G.zeit+bt+KONFIG.schonzeit;
   r.zustand='pause'; r.pauseZeit=2; r.cooldown=2.5; r.zielSpieler=null; r.entdeckung={};
   for(const o of G.roboter) if(o.zielSpieler===p.id){ o.zustand='suche'; o.suchZeit=1.5; o.zielSpieler=null; }
-  ereignis({k:'erwischt',id:p.id,n,strafe});
+  ereignis({k:'erwischt',id:p.id,n,strafe,w:r.typ==='wuet'?1:0});
 }
 function kameraSieht(c,p){
   if((p.e||0)!==c.e||Math.abs((p.y||0)-c.e*H1)>1.2) return false;
@@ -1697,7 +1711,7 @@ function starteRunde(){
     const a=(i/n)*Math.PI*2+Math.PI/2; p.x=Math.cos(a)*3.1; p.z=Math.sin(a)*3.1; p.e=0; p.y=0; p.rot=Math.atan2(p.x,p.z);
     p.carry=[]; p.geld=0; p.stunBis=0; p.schonBis=0; p.fallBis=0; p.fallLokalBis=0; p.schubsBereit=0; p.schubsSchutz=0; p.kbx=p.kbz=0; p.verkaufT=0; p.inventar=[]; p.effBis=[0,0,0]; p.effRest=[0,0,0]; i++;
   }
-  G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k));
+  G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k)); for(let k=0;k<KONFIG.wueterichAnzahl;k++){ const r=neuerRoboter(k,'wuet'); r.i=G.roboter.length; G.roboter.push(r); }
   G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k)); G.kameras=neueKameras();
   for(let k=0;k<KONFIG.itemsMax-8;k++){ const p=zufallsPunktItem(3); neuesItem(zufallsTyp(p.x,p.z,p.e),p.x,p.z,false,p.e); }
   G.modus='spiel';
@@ -1728,7 +1742,7 @@ function lokalesEreignis(e){
       if(!me || Math.hypot(me.x-x,me.z-z)<24) Sound.alarm();
       break; }
     case 'erwischt':
-      if(istIch){ zeigeMsg('ERWISCHT!', 'rot', e.n?`Roboter kassiert ${e.n} Teil${e.n>1?'e':''} ein`:''); Sound.erwischt(); wackeln=0.5; if(navigator.vibrate) navigator.vibrate(200); }
+      if(istIch){ zeigeMsg(e.w?'WÜTERICH!':'ERWISCHT!', 'rot', e.n?`${e.w?'Der Wüterich':'Roboter'} kassiert ${e.n} Teil${e.n>1?'e':''} ein`:''); Sound.erwischt(); wackeln=0.5; if(navigator.vibrate) navigator.vibrate(200); }
       else if(view) popup(view.position, 'erwischt!', 'rot');
       break;
     case 'verkauf':
@@ -1825,7 +1839,7 @@ function sendeItems(){ G.itemsDirty=false; itemSyncT=0; Netz.sendAlle({t:'i',l:[
 function sendeSnapshot(){
   Netz.sendAlle({t:'s',z:Math.round(G.restzeit*10)/10,
     p:[...G.spieler.values()].map(p=>[p.id,r2(p.x),r2(p.z),r2(p.rot),p.bewegt?1:0,G.zeit<p.stunBis?1:0,G.zeit<p.schonBis?1:0,p.geld,p.carry.join(','),G.zeit<p.fallBis?1:0,p.inventar.join(','),p.effRest.map(v=>Math.round(v*10)/10),p.e||0]),
-    r:G.roboter.map(r=>[r2(r.x),r2(r.z),r2(r.rot),r2(r.kopf),ZST.indexOf(r.zustand),r.e,(r.beute||[]).join(',')]),
+    r:G.roboter.map(r=>[r2(r.x),r2(r.z),r2(r.rot),r2(r.kopf),ZST.indexOf(r.zustand),r.e,(r.beute||[]).join(','),r.typ==='wuet'?1:0]),
     k:G.kameras.map(c=>[r2(c.ang),c.alarmT>0?1:0]),
     d:G.drohnen.map(d=>[r2(d.x),r2(d.y),r2(d.z),DZST.indexOf(d.zustand),d.traegt,r2(d.zustand==='verfolgen'?d.lockZeit/KONFIG.klauZeit:0)])});
 }
@@ -1884,7 +1898,7 @@ function clientEmpfang(d){
         if(e[0]!==G.meineId){ p.x=e[1]; p.z=e[2]; p.rot=e[3]; p.bewegt=e[4]; p.e=e[12]||0; p.y=hoeheBei(p.x,p.z,p.e); }
         p.stun=!!e[5]; p.schon=!!e[6]; p.geld=e[7]; p.carry=e[8]?e[8].split(',').map(Number):[]; p.fall=!!e[9]; p.inventar=e[10]?e[10].split(','):[]; p.effRest=e[11]||[0,0,0];
       }
-      d.r.forEach((e,i)=>{ let r=G.roboter[i]; if(!r) r=G.roboter[i]={i}; r.x=e[0]; r.z=e[1]; r.rot=e[2]; r.kopf=e[3]; r.zustand=ZST[e[4]]; r.e=e[5]||0; r.beute=e[6]?e[6].split(',').map(Number):[]; r.y=hoeheBei(r.x,r.z,r.e); });
+      d.r.forEach((e,i)=>{ let r=G.roboter[i]; if(!r) r=G.roboter[i]={i}; r.x=e[0]; r.z=e[1]; r.rot=e[2]; r.kopf=e[3]; r.zustand=ZST[e[4]]; r.e=e[5]||0; r.beute=e[6]?e[6].split(',').map(Number):[]; r.typ=e[7]?'wuet':'normal'; r.T=ROBOTER_TYPEN[r.typ]; r.y=hoeheBei(r.x,r.z,r.e); });
       G.roboter.length=d.r.length;
       d.d.forEach((e,i)=>{ let o=G.drohnen[i]; if(!o) o=G.drohnen[i]={i}; o.x=e[0]; o.y=e[1]; o.z=e[2]; o.zustand=DZST[e[3]]; o.traegt=e[4]; o.prog=e[5]; });
       G.drohnen.length=d.d.length;
@@ -2124,18 +2138,23 @@ function syncViews(dt,uhr){
 
   // ----- Roboter
   while(VIEWS.roboter.length<G.roboter.length){
-    const v=makeRoboterMesh(); const r=G.roboter[VIEWS.roboter.length];
-    v.position.set(r.x,0,r.z); v.rotation.y=r.rot||0; v.userData.kopfRot=0; v.userData.alarmT=0;
-    v.userData.kegel=makeKegel(); v.userData.lbl=makeLabel('alarm','!'); scene.add(v); VIEWS.roboter.push(v);
+    const r=G.roboter[VIEWS.roboter.length], v=makeRoboterMesh(r.typ);
+    v.position.set(r.x,0,r.z); v.rotation.y=r.rot||0; v.userData.kopfRot=0; v.userData.alarmT=0; v.userData.typ=r.typ;
+    v.userData.kegel=makeKegel(); { const T=r.T||ROBOTER_TYPEN.normal, u=v.userData.kegel.material.uniforms; u.uRange.value=T.sicht; u.uHalb.value=T.winkel; if(r.typ==='wuet') u.uCol.value.setHex(0xd4142a); } v.userData.lbl=makeLabel('alarm','!'); scene.add(v); VIEWS.roboter.push(v);
   }
   while(VIEWS.roboter.length>G.roboter.length){ const v=VIEWS.roboter.pop(); scene.remove(v); scene.remove(v.userData.kegel); fxObjekte.delete(v.userData.kegel); v.userData.lbl.remove(); }
   G.roboter.forEach((r,i)=>{
-    const v=VIEWS.roboter[i], ud=v.userData;
+    let v=VIEWS.roboter[i];
+    if(v.userData.typ!==(r.typ||'normal')){ scene.remove(v); scene.remove(v.userData.kegel); fxObjekte.delete(v.userData.kegel); v.userData.lbl.remove();
+      const nv=makeRoboterMesh(r.typ); nv.position.copy(v.position); nv.rotation.y=v.rotation.y; Object.assign(nv.userData,{kopfRot:0,alarmT:0,typ:r.typ||'normal',kegel:makeKegel(),lbl:makeLabel('alarm','!')});
+      { const T=r.T||ROBOTER_TYPEN.normal, u=nv.userData.kegel.material.uniforms; u.uRange.value=T.sicht; u.uHalb.value=T.winkel; if(r.typ==='wuet') u.uCol.value.setHex(0xd4142a); }
+      scene.add(nv); VIEWS.roboter[i]=nv; v=nv; }
+    const ud=v.userData;
     v.position.x=lerp(v.position.x,r.x,k); v.position.z=lerp(v.position.z,r.z,k); v.position.y=lerp(v.position.y,hoeheBei(r.x,r.z,r.e||0),k);
     v.rotation.y+=angDiff(v.rotation.y,r.rot)*k; ud.kopfRot+=angDiff(ud.kopfRot,r.kopf)*k;
     if(ud.kopf) ud.kopf.rotation.y=ud.kopfRot;
     const blick=v.rotation.y+ud.kopfRot;
-    updateKegel(ud.kegel,v.position.x+Math.sin(blick)*0.35,v.position.z+Math.cos(blick)*0.35,blick,r.e||0,v.position.y);
+    { const T=r.T||ROBOTER_TYPEN.normal; updateKegel(ud.kegel,v.position.x+Math.sin(blick)*0.35,v.position.z+Math.cos(blick)*0.35,blick,r.e||0,v.position.y,T.sicht,T.winkel); }
     const u=ud.kegel.material.uniforms; u.uZeit.value=uhr;
     const jagd=r.zustand==='jagd', suche=r.zustand==='suche';
     u.uAlpha.value = jagd ? 0.42+Math.sin(uhr*12)*0.08 : suche ? 0.34 : (r.zustand==='pause'&&G.modus==='spiel'?0.26:0.27);
@@ -2144,7 +2163,7 @@ function syncViews(dt,uhr){
     ud.alarmT=Math.max(0,(ud.alarmT||0)-dt);
     const bk=(r.beute||[]).join(',');
     if(bk!==ud.beuteKey&&ud.stapel){ ud.beuteKey=bk; ud.stapel.clear(); let yy=0; (r.beute||[]).forEach((typ,j)=>{ const m=makeItemMesh(typ); m.scale.multiplyScalar(0.5); m.position.y=yy; m.rotation.y=j*1.1; ud.stapel.add(m); yy+=0.1+ITEMS[typ].gewicht*0.05; }); }
-    ud.lbl.textContent = jagd?'!':'?';
+    ud.lbl.textContent = jagd?(r.typ==='wuet'?'!!':'!'):'?';
     ud.lbl.className='lbl '+(jagd?'alarm':'frage');
     setzeLabel(ud.lbl,v.position.x,v.position.y+2.75+(ud.alarmT>0?Math.sin(ud.alarmT*20)*0.1:0),v.position.z,(jagd||suche)&&G.modus==='spiel');
   });
@@ -2429,7 +2448,7 @@ function zurueckZumMenu(status=''){
 }
 function starteDemo(){
   G.zeit=0;
-  G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k));
+  G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k)); for(let k=0;k<KONFIG.wueterichAnzahl;k++){ const r=neuerRoboter(k,'wuet'); r.i=G.roboter.length; G.roboter.push(r); }
   G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k)); G.kameras=neueKameras();
   G.items.clear(); for(let k=0;k<40;k++){ const p=zufallsPunktItem(0); neuesItem(zufallsTyp(p.x,p.z,p.e),p.x,p.z,false,p.e); }
 }
