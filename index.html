@@ -173,7 +173,7 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
     <div class="reihe"><input id="codeIn" maxlength="4" placeholder="CODE" autocomplete="off"><button class="btn rosa" id="bJoin">Beitreten</button></div>
     <div id="status"></div>
     <div class="hilfe">
-      <b>Steuerung:</b> Handy: links ziehen = laufen, Knopf rechts = aufheben, Zwei-Finger-Zoom. PC: WASD/Pfeile, E/Leertaste = aufheben, F = schubsen, Q = ablegen, Mausrad = Zoom.<br><b>Karte:</b> Je weiter weg von der Mitte – und oben auf Dächern, Containern und Gerüsten –, desto wertvoller die Beute. Unter Dächern und Gerüsten sehen dich Drohnen nicht. 🗺 bzw. M zeigt die Karte.<br><b>Laden:</b> Am Ankauf kannst du mit deinem Geld Fähigkeiten kaufen (Unsichtbarkeit, Rauchwolke, Turbo, Muskelkraft) und sie später einsetzen (PC: 1–3, B = Laden). Ausgegebenes Geld zählt nicht mehr zum Sieg!<br><b>Schubsen:</b> Wer geschubst wird, fällt kurz hin und verliert ein Teil – Roboter können ihn dann schnappen!<br>
+      <b>Steuerung:</b> Handy: links ziehen = laufen, Knopf rechts = aufheben, Zwei-Finger-Zoom. PC: WASD/Pfeile, E/Leertaste = aufheben, F = schubsen, Q = ablegen, Mausrad = Zoom.<br><b>Kameras:</b> Orange Kegel = Überwachungskameras. Sie fangen dich nicht, schlagen aber Alarm und rufen Roboter und Drohnen herbei.<br><b>Karte:</b> Je weiter weg von der Mitte – und oben auf Dächern, Containern und Gerüsten –, desto wertvoller die Beute. Unter Dächern und Gerüsten sehen dich Drohnen nicht. 🗺 bzw. M zeigt die Karte.<br><b>Laden:</b> Am Ankauf kannst du mit deinem Geld Fähigkeiten kaufen (Unsichtbarkeit, Rauchwolke, Turbo, Muskelkraft) und sie später einsetzen (PC: 1–3, B = Laden). Ausgegebenes Geld zählt nicht mehr zum Sieg!<br><b>Schubsen:</b> Wer geschubst wird, fällt kurz hin und verliert ein Teil – Roboter können ihn dann schnappen!<br>
       <b>Gefahren:</b> Rote Kegel = Sicht der Roboter. Rote Kreise = Drohnen-Scanner – bleibst du drin, klaut die Drohne dein wertvollstes Teil. Erwischt dich ein Roboter, verlierst du alles, was du trägst. Hinter Wänden sehen dich Roboter nicht – Drohnen fliegen aber drüber. In der Ankauf-Zone bist du sicher.
     </div>
   </div>
@@ -422,6 +422,21 @@ function bereichBei(x,z){
   for(const b of BEREICHE){ const [x1,z1,x2,z2]=b.box; if(x>=x1&&x<x2&&z>=z1&&z<z2) return b.name; }
   return 'Hof';
 }
+/* Überwachungskameras: x,z = Standort, e = Etage, dir = Blickrichtung (0 = Süden, π/2 = Osten),
+   schwenk = wie weit sie hin und her schwenkt. Sehen sie dich, schlagen sie Alarm und rufen Roboter & Drohnen. */
+const KAMERAS = [
+  {x:38.4,z:-27.5,e:0,dir:-1.571,schwenk:0.55},   // Container-Terminal, Gasse
+  {x:21,z:-21,e:0,dir:2.356,schwenk:0.7},         // Eingang Container-Terminal
+  {x:37,z:35,e:0,dir:-2.356,schwenk:0.5},         // in der Lagerhalle
+  {x:37.4,z:22.6,e:1,dir:-0.785,schwenk:0.6},     // Hallendach
+  {x:-21,z:21,e:0,dir:-0.785,schwenk:0.7},        // Gerüst
+  {x:-38.4,z:-28,e:0,dir:1.571,schwenk:0.6},      // Schrottplatz
+  {x:-6,z:-38.4,e:0,dir:0.2,schwenk:0.8},         // Reifenlager
+  {x:38.4,z:8,e:0,dir:-1.571,schwenk:0.7},        // Rohrlager
+  {x:3,z:33,e:0,dir:-2.356,schwenk:0.5},          // in der Werkstatt
+  {x:-38.4,z:10,e:0,dir:1.571,schwenk:0.8},       // Fasslager
+];
+const KAMERA_WEITE=11, KAMERA_WINKEL=24*Math.PI/180;
 // Wachposten der Roboter (Startpunkt + Revier, e = Etage)
 const ROBOTER_POSTEN = [
   {x:0,z:-15,e:0},{x:0,z:15,e:0},{x:24,z:-30,e:0},{x:33,z:-31,e:1},{x:29,z:28.2,e:0},
@@ -533,11 +548,12 @@ const navOK=[new Uint8Array(NZ), new Uint8Array(NZ)];
 const rampenEbene=c=>rampeH[c]>=H1/2?1:0;
 function baueNav(){
   const basis=(L,c)=>rampeH[c]>=0 ? rampenEbene(c)===L : begehbar[L][c]===1;
-  const nb=(L,n)=>n>=0 && (rampeH[n]>=0 || begehbar[L][n]===1);
+  // Nachbar zählt nur als frei, wenn er (bei Rampen) etwa auf gleicher Höhe liegt
+  const nbH=(L,c,n)=>{ if(n<0) return false; if(rampeH[n]>=0){ const ref=rampeH[c]>=0?rampeH[c]:L*H1; return Math.abs(rampeH[n]-ref)<0.5; } return begehbar[L][n]===1; };
   for(let L=0;L<2;L++) for(let c=0;c<NZ;c++){
     let ok=basis(L,c);
     if(ok){ const i=c%GN, j=(c/GN)|0;
-      for(let dj=-1;dj<=1&&ok;dj++) for(let di=-1;di<=1;di++){ const ni=i+di,nj=j+dj; if(ni<0||nj<0||ni>=GN||nj>=GN||!nb(L,nj*GN+ni)){ ok=false; break; } }
+      for(let dj=-1;dj<=1&&ok;dj++) for(let di=-1;di<=1;di++){ const ni=i+di,nj=j+dj; if(ni<0||nj<0||ni>=GN||nj>=GN||!nbH(L,c,nj*GN+ni)){ ok=false; break; } }
     }
     if(ok&&L===0&&rampeH[c]<0&&Math.hypot(zMitte(c%GN),zMitte((c/GN)|0))<KONFIG.stationZone+0.6) ok=false;
     navOK[L][c]=ok?1:0;
@@ -658,6 +674,7 @@ const Sound = {
   ablegen(){ this.ton(320,0.12,'triangle',0.22,0.55); },
   schubs(){ this.ton(180,0.12,'square',0.2,0.5); this.ton(90,0.25,'triangle',0.25,0.6,0.05); },
   luft(){ this.ton(600,0.12,'sine',0.12,0.4); },
+  sirene(){ for(let i=0;i<4;i++){ this.ton(660,0.2,'square',0.1,1,i*0.4); this.ton(880,0.2,'square',0.1,1,i*0.4+0.2); } },
   faehigkeit(){ this.ton(330,0.35,'triangle',0.2,3); this.ton(660,0.3,'sine',0.12,2,0.1); },
   start(){ [392,523,659].forEach((f,i)=>this.ton(f,0.18,'square',0.1,1,i*0.1)); },
   ende(){ [523,659,784,1046].forEach((f,i)=>this.ton(f,0.25,'square',0.11,1,i*0.12)); },
@@ -942,7 +959,7 @@ function baueContainer(B,b,y0,h,farbe){
 function baueMauer(k){
   const B=new Bau(), [x1,z1,x2,z2]=k.box, w=x2-x1, d=z2-z1, cx=(x1+x2)/2, cz=(z1+z2)/2, h=k.h||2.3, lx=w>d;
   B.box(w,h,d,0xeee4d8,cx,h/2,cz).box(w+0.14,0.16,d+0.14,0xd5c4b3,cx,h+0.08,cz).box(w+0.1,0.3,d+0.1,0xe2d5c7,cx,0.15,cz);
-  const L=lx?w:d; for(const s of [-1,1]) B.box(lx?0.28:w+0.16,h+0.02,lx?d+0.16:0.28,0xe2d5c7,cx+(lx?s*(L/2-0.14):0),h/2,cz+(lx?0:s*(L/2-0.14)));
+  const L=lx?w:d; for(const s of [-1,1]) B.box(lx?0.28:w+0.16,h+0.03,lx?d+0.16:0.28,0xe2d5c7,cx+(lx?s*(L/2-0.12):0),h/2,cz+(lx?0:s*(L/2-0.12)));
   B.fertig(vol(k.box,0,h+0.2));
 }
 function baueKarte(){
@@ -968,7 +985,7 @@ function baueKarte(){
               B.box(lx?l*0.96:w*0.97,hl*0.94,lx?d*0.97:l*0.96,f,px+rnd(-0.06,0.06),t*hl+hl/2,pz+rnd(-0.06,0.06),rnd(-0.03,0.03));
               B.box(lx?l*0.5:w*0.6,0.08,lx?d*0.6:l*0.5,0x4a4f55,px,t*hl+hl*0.62,pz); } }
         }
-        B.box(w,0.06,d,k.stil==='container'?0x7a7f86:0x6f6258,cx,H1-0.02,cz);
+        B.box(w+0.02,0.06,d+0.02,k.stil==='container'?0x8d939a:0x8a7d72,cx,H1-0.02,cz);
         B.fertig(vol(k.box,0,H1)); break;
       case 'plattform': {
         B.box(w,0.25,d,0xc79b68,cx,H1-0.125,cz);
@@ -1039,8 +1056,8 @@ function baueKarte(){
         B.fertig(vol(k.box,0,hh)); break; }
       case 'kiste': {
         const hh=k.h||1.0;
-        B.box(w,hh,d,0xc9a06a,cx,y0+hh/2,cz).box(w+0.04,0.1,d+0.04,0x8a6845,cx,y0+hh-0.05,cz).box(w+0.04,0.1,d+0.04,0x8a6845,cx,y0+0.05,cz)
-         .box(0.1,hh,d+0.04,0x8a6845,x1+0.05,y0+hh/2,cz).box(0.1,hh,d+0.04,0x8a6845,x2-0.05,y0+hh/2,cz);
+        B.box(w,hh,d,0xc9a06a,cx,y0+0.02+hh/2,cz).box(w+0.05,0.11,d+0.05,0x8a6845,cx,y0+hh-0.02,cz).box(w+0.05,0.11,d+0.05,0x8a6845,cx,y0+0.07,cz)
+         .box(0.11,hh-0.12,d+0.07,0x8a6845,x1+0.035,y0+0.02+hh/2,cz).box(0.11,hh-0.12,d+0.07,0x8a6845,x2-0.035,y0+0.02+hh/2,cz);
         B.fertig(vol(k.box,y0,y0+hh)); break; }
     }
   }
@@ -1222,6 +1239,19 @@ function makeRoboterMesh(){
   schatten(g); return g;
 }
 
+function makeKameraMesh(k){
+  const g=new THREE.Group(), y0=k.e*H1, B=new Bau();
+  const kante=Math.abs(k.x)>37||Math.abs(k.z)>37;
+  if(!kante) B.zyl(0.07,0.09,2.7,8,0x5f666d,k.x,y0+1.35,k.z).zyl(0.25,0.3,0.12,10,0x5f666d,k.x,y0+0.06,k.z);
+  else B.box(0.36,0.4,0.36,0x5f666d,k.x,y0+KONFIG.wandHoehe+0.2,k.z);
+  B.fertig(null);
+  const kopf=new THREE.Group(); kopf.position.set(k.x,y0+(kante?KONFIG.wandHoehe+0.55:2.85),k.z); kopf.scale.setScalar(1.5); g.add(kopf);
+  const gehaeuse=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.28,0.62),toon(0xe9e6e0)); gehaeuse.position.z=0.18; kopf.add(gehaeuse);
+  const schirm=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.05,0.72),toon(0xb9b4ac)); schirm.position.set(0,0.17,0.22); kopf.add(schirm);
+  const linse=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.06,14),toon(0x2a2321)); linse.rotation.x=Math.PI/2; linse.position.z=0.5; kopf.add(linse);
+  const ledMat=new THREE.MeshBasicMaterial({color:0xff3b30}); const led=new THREE.Mesh(new THREE.SphereGeometry(0.045,8,6),ledMat); led.position.set(0.1,0.08,0.5); kopf.add(led);
+  schatten(g); g.userData={kopf,ledMat,alarmT:0}; return g;
+}
 function makeDrohneMesh(){
   const g=new THREE.Group();
   if(VORLAGEN.drohne){ const m=klonModell('drohne'); g.add(m); const rot=[]; m.traverse(o=>{ if(/^Rotor/i.test(o.name)) rot.push(o); }); g.userData={rotoren:rot}; return g; }
@@ -1292,8 +1322,8 @@ function makeKegel(){
     vertexShader:kegelVert, fragmentShader:kegelFrag, transparent:true, depthWrite:false, side:THREE.DoubleSide });
   const m=new THREE.Mesh(geo,mat); m.frustumCulled=false; m.renderOrder=3; scene.add(fx(m)); return m;
 }
-function updateKegel(k, ox, oz, blick, e=0, y=0){
-  const pos=k.geometry.attributes.position.array, half=KONFIG.sichtWinkel*Math.PI/180, R=KONFIG.sichtWeite, ky=y+0.06;
+function updateKegel(k, ox, oz, blick, e=0, y=0, R=KONFIG.sichtWeite, half=KONFIG.sichtWinkel*Math.PI/180){
+  const pos=k.geometry.attributes.position.array, ky=y+0.06;
   pos[0]=ox; pos[1]=ky; pos[2]=oz;
   for(let i=0;i<=KEGEL_N;i++){
     const a=blick-half+2*half*i/KEGEL_N, dx=Math.sin(a), dz=Math.cos(a), d=strahl(e,ox,oz,dx,dz,R), j=(i+1)*3;
@@ -1335,7 +1365,7 @@ const G = {
   meineId:'host',
   spieler:new Map(),     // id → Spieler
   items:new Map(),       // id → {id,typ,x,z}  (nur Teile am Boden)
-  roboter:[], drohnen:[],
+  roboter:[], drohnen:[], kameras:[],
   restzeit:0, dauer:300, zeit:0,
   itemId:1, itemsDirty:true, spawnT:0, endspurt:false
 };
@@ -1352,6 +1382,7 @@ function neuerRoboter(i){
   const o={x:post.x+rnd(-0.5,0.5),z:post.z+rnd(-0.5,0.5),e:post.e}; sichern(o,0.5);
   return {i,x:o.x,z:o.z,e:o.e,y:o.y,heim:post,rot:rnd(0,6.28),kopf:0,zustand:'patrouille',ziel:zielNahe(post.x,post.z,12),zielSpieler:null,verloren:0,suchZeit:0,pauseZeit:0,entdeckung:{},cooldown:0,alarmBis:0,phase:rnd(0,6)};
 }
+function neueKameras(){ return KAMERAS.map((k,i)=>({i,x:k.x,z:k.z,e:k.e,basis:k.dir,schwenk:k.schwenk,ang:k.dir,phase:rnd(0,6),entdeckung:{},alarmT:0,cool:0})); }
 function neueDrohne(i){
   const p=zufallsPunktDrohne();
   return {i,x:p.x,y:KONFIG.drohnenHoehe,z:p.z,vx:0,vz:0,zustand:'kreisen',ziel:null,zielSpieler:null,lockZeit:0,verloren:0,traegt:-1,alarmT:0,immun:{}};
@@ -1388,6 +1419,7 @@ function hostTick(dt){
   }
   for(const r of G.roboter) roboterTick(r,dt);
   for(const d of G.drohnen) drohneTick(d,dt);
+  for(const c of G.kameras) kameraTick(c,dt);
   // Roboter schieben sich auseinander
   for(let a=0;a<G.roboter.length;a++) for(let b=a+1;b<G.roboter.length;b++){
     const A=G.roboter[a], B=G.roboter[b], dx=B.x-A.x, dz=B.z-A.z, d=Math.hypot(dx,dz);
@@ -1466,6 +1498,14 @@ function roboterTick(r,dt){
       if(r.suchZeit<=0){ r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,12); }
       break; }
   }
+  // Notausgang: steckt der Roboter fest, neu planen – und notfalls ein anderes Ziel nehmen
+  if(r.zustand==='pause'||r.ziel!==r.zielRef){ r.zielRef=r.ziel; r.bestD=1e9; r.steckT=0; }
+  else {
+    const dz=Math.hypot(r.ziel.x-r.x,r.ziel.z-r.z)+(r.ziel.e!==r.e?6:0);
+    if(dz<r.bestD-0.3){ r.bestD=dz; r.steckT=0; } else r.steckT+=dt;
+    if(r.steckT>2.5&&r.steckT-dt<=2.5){ r.pfad=null; r.pfadT=0; bewege(r,rnd(-0.3,0.3),rnd(-0.3,0.3),0.45); }
+    if(r.steckT>5){ r.steckT=0; r.bestD=1e9; if(r.zustand==='patrouille'){ r.zustand='pause'; r.pauseZeit=rnd(0.5,1.5); } else if(r.zustand==='suche') r.suchZeit=0; }
+  }
 }
 function fangen(r,p){
   const n=p.carry.length;
@@ -1476,6 +1516,31 @@ function fangen(r,p){
   r.zustand='pause'; r.pauseZeit=2; r.cooldown=2.5; r.zielSpieler=null; r.entdeckung={};
   for(const o of G.roboter) if(o.zielSpieler===p.id){ o.zustand='suche'; o.suchZeit=1.5; o.zielSpieler=null; }
   ereignis({k:'erwischt',id:p.id,n,strafe});
+}
+function kameraSieht(c,p){
+  if((p.e||0)!==c.e||Math.abs((p.y||0)-c.e*H1)>1.2) return false;
+  const dx=p.x-c.x, dz=p.z-c.z, d=Math.hypot(dx,dz); if(d>KAMERA_WEITE||d<0.3) return false;
+  if((dx*Math.sin(c.ang)+dz*Math.cos(c.ang))/d<Math.cos(KAMERA_WINKEL)) return false;
+  return strahl(c.e,c.x,c.z,dx/d,dz/d,d)>=d-0.35;
+}
+function kameraTick(c,dt){
+  c.cool=Math.max(0,c.cool-dt); c.alarmT=Math.max(0,c.alarmT-dt);
+  if(c.alarmT<=0) c.ang=c.basis+Math.sin(G.zeit*0.45+c.phase)*c.schwenk;
+  if(c.cool>0&&c.alarmT<=0) return;
+  for(const p of G.spieler.values()){
+    if(!zielbar(p)||!kameraSieht(c,p)){ c.entdeckung[p.id]=Math.max(0,(c.entdeckung[p.id]||0)-dt); continue; }
+    c.entdeckung[p.id]=(c.entdeckung[p.id]||0)+dt*1.6;
+    if(c.entdeckung[p.id]<0.45) continue;
+    if(c.alarmT<=0){ ereignis({k:'kamera',i:c.i,id:p.id}); c.alarmT=3; c.cool=6;
+      // nächste freie Drohne schickt sie hin
+      let best=null, bd=32; for(const d of G.drohnen){ if(d.zustand!=='kreisen') continue; const dd=Math.hypot(d.x-p.x,d.z-p.z); if(dd<bd){ bd=dd; best=d; } }
+      if(best){ best.zustand='verfolgen'; best.zielSpieler=p.id; best.lockZeit=0; best.verloren=-1.5; }
+    }
+    // solange die Kamera dich sieht, kennen die Roboter deine Position
+    c.ang+=clamp(angDiff(c.ang,Math.atan2(p.x-c.x,p.z-c.z)),-2*dt,2*dt);
+    alarmiereRoboter(p,c.x,c.z,22,null); c.alarmT=Math.max(c.alarmT,1.2);
+    break;
+  }
 }
 function steuere(d,t,tempo,dt){
   const dx=t.x-d.x, dz=t.z-d.z, l=Math.hypot(dx,dz)||1, f=Math.min(1,l/1.5);
@@ -1592,7 +1657,7 @@ function starteRunde(){
     p.carry=[]; p.geld=0; p.stunBis=0; p.schonBis=0; p.fallBis=0; p.fallLokalBis=0; p.schubsBereit=0; p.schubsSchutz=0; p.kbx=p.kbz=0; p.verkaufT=0; p.inventar=[]; p.effBis=[0,0,0]; p.effRest=[0,0,0]; i++;
   }
   G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k));
-  G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k));
+  G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k)); G.kameras=neueKameras();
   for(let k=0;k<KONFIG.itemsMax-8;k++){ const p=zufallsPunktItem(3); neuesItem(zufallsTyp(p.x,p.z,p.e),p.x,p.z,false,p.e); }
   G.modus='spiel';
   if(G.online){ sendeRoster(); Netz.sendAlle(startNachricht()); sendeItems(); }
@@ -1644,6 +1709,11 @@ function lokalesEreignis(e){
       if(istIch){ zeigeMsg(F.icon+' '+F.name.toUpperCase()+'!','gelb',F.slot<0?(G.spieler.size>1?'Die anderen sehen nichts mehr':'(keine Mitspieler da)'):F.dauer+' Sekunden',1.4); Sound.faehigkeit(); }
       else if(F.key==='rauch'){ starteRauch(F.dauer); zeigeMsg('RAUCH!','rot',(G.spieler.get(e.id)?.name||'Jemand')+' vernebelt dir die Sicht',1.6); Sound.klau(); }
       else if(F.key!=='unsicht' && view) popup(view.position,F.icon);
+      break; }
+    case 'kamera': {
+      const v=VIEWS.kameras[e.i]; if(v) v.userData.alarmT=1.5;
+      if(istIch){ zeigeMsg('KAMERA!','rot','Alarm ausgelöst – Roboter kommen',1.6); if(navigator.vibrate) navigator.vibrate([80,60,80]); }
+      if(istIch||(me&&v&&Math.hypot(v.position.x-me.x,v.position.z-me.z)<30)) Sound.sirene();
       break; }
     case 'luft': { const v=VIEWS.spieler.get(e.id); if(v) v.userData.schubsT=0.3; if(istIch) Sound.luft(); break; }
     case 'schubs': {
@@ -1715,6 +1785,7 @@ function sendeSnapshot(){
   Netz.sendAlle({t:'s',z:Math.round(G.restzeit*10)/10,
     p:[...G.spieler.values()].map(p=>[p.id,r2(p.x),r2(p.z),r2(p.rot),p.bewegt?1:0,G.zeit<p.stunBis?1:0,G.zeit<p.schonBis?1:0,p.geld,p.carry.join(','),G.zeit<p.fallBis?1:0,p.inventar.join(','),p.effRest.map(v=>Math.round(v*10)/10),p.e||0]),
     r:G.roboter.map(r=>[r2(r.x),r2(r.z),r2(r.rot),r2(r.kopf),ZST.indexOf(r.zustand),r.e]),
+    k:G.kameras.map(c=>[r2(c.ang),c.alarmT>0?1:0]),
     d:G.drohnen.map(d=>[r2(d.x),r2(d.y),r2(d.z),DZST.indexOf(d.zustand),d.traegt,r2(d.zustand==='verfolgen'?d.lockZeit/KONFIG.klauZeit:0)])});
 }
 function hostEmpfang(id,d){
@@ -1758,7 +1829,7 @@ function clientEmpfang(d){
       if(G.modus==='lobby') zeigeLobby();
       break; }
     case 'start':
-      G.modus='spiel'; G.dauer=d.dauer; G.restzeit=d.rest; G.roboter=[]; G.drohnen=[]; G.endspurt=false;
+      G.modus='spiel'; G.dauer=d.dauer; G.restzeit=d.rest; G.roboter=[]; G.drohnen=[]; G.kameras=neueKameras(); G.endspurt=false;
       for(const [id,x,z,rot] of d.p){ const p=G.spieler.get(id); if(p){ p.x=x; p.z=z; p.e=0; p.y=0; p.rot=rot; p.carry=[]; p.geld=0; p.inventar=[]; p.effRest=[0,0,0]; } }
       zeigeSpiel(); break;
     case 'i': {
@@ -1776,6 +1847,7 @@ function clientEmpfang(d){
       G.roboter.length=d.r.length;
       d.d.forEach((e,i)=>{ let o=G.drohnen[i]; if(!o) o=G.drohnen[i]={i}; o.x=e[0]; o.y=e[1]; o.z=e[2]; o.zustand=DZST[e[3]]; o.traegt=e[4]; o.prog=e[5]; });
       G.drohnen.length=d.d.length;
+      if(d.k){ if(G.kameras.length!==d.k.length) G.kameras=neueKameras(); d.k.forEach((e,i)=>{ G.kameras[i].ang=e[0]; G.kameras[i].alarm=!!e[1]; }); }
       break; }
     case 'e': lokalesEreignis(d.e); break;
     case 'ende': G.modus='ende'; zeigeEnde(d.rang); break;
@@ -1888,7 +1960,7 @@ function lokalBewegen(dt){
 /* =====================================================================
    DARSTELLUNG: Zustand → 3D-Objekte
    ===================================================================== */
-const VIEWS={spieler:new Map(), items:new Map(), roboter:[], drohnen:[]};
+const VIEWS={spieler:new Map(), items:new Map(), roboter:[], drohnen:[], kameras:[]};
 const labelEbene=document.getElementById('labels');
 function makeLabel(cls,txt){ const el=document.createElement('div'); el.className='lbl '+cls; el.textContent=txt; labelEbene.appendChild(el); return el; }
 const _v=new THREE.Vector3();
@@ -2032,6 +2104,17 @@ function syncViews(dt,uhr){
     ud.lbl.className='lbl '+(jagd?'alarm':'frage');
     setzeLabel(ud.lbl,v.position.x,v.position.y+2.75+(ud.alarmT>0?Math.sin(ud.alarmT*20)*0.1:0),v.position.z,(jagd||suche)&&G.modus==='spiel');
   });
+
+  // ----- Überwachungskameras
+  while(VIEWS.kameras.length<G.kameras.length){ const c=G.kameras[VIEWS.kameras.length], v=makeKameraMesh(c);
+    const kegel=makeKegel(); kegel.material.uniforms.uCol.value.setHex(0xff9a1f); kegel.material.uniforms.uRange.value=KAMERA_WEITE; kegel.material.uniforms.uHalb.value=KAMERA_WINKEL;
+    Object.assign(v.userData,{kegel,lbl:makeLabel('alarm','!'),ang:c.ang}); scene.add(v); VIEWS.kameras.push(v); }
+  G.kameras.forEach((c,i)=>{ const v=VIEWS.kameras[i], ud=v.userData, alarm=G.istHost?c.alarmT>0:!!c.alarm;
+    ud.ang+=angDiff(ud.ang,c.ang)*k; ud.kopf.rotation.y=ud.ang; ud.kopf.rotation.x=0.25;
+    updateKegel(ud.kegel,c.x+Math.sin(ud.ang)*0.4,c.z+Math.cos(ud.ang)*0.4,ud.ang,c.e,c.e*H1,KAMERA_WEITE,KAMERA_WINKEL);
+    const u=ud.kegel.material.uniforms; u.uZeit.value=uhr; u.uCol.value.setHex(alarm&&Math.floor(uhr*6)%2?0xff2b22:0xff9a1f); u.uAlpha.value=alarm?0.42:0.24;
+    ud.ledMat.color.setHex(alarm?(Math.floor(uhr*8)%2?0xffd23f:0xff2b22):(Math.floor(uhr*1.5)%2?0xff3b30:0x5a1a16));
+    setzeLabel(ud.lbl,c.x,c.e*H1+3.6,c.z,alarm&&G.modus==='spiel'); });
 
   // ----- Drohnen
   while(VIEWS.drohnen.length<G.drohnen.length){
@@ -2238,6 +2321,7 @@ function zeichneKarte(){
   g.font='bold 15px Bangers, Impact, sans-serif'; g.textAlign='center'; g.fillStyle='#2a2321';
   for(const b of BEREICHE){ const [x1,z1,x2,z2]=b.box; g.fillText(b.name.toUpperCase(),px((x1+x2)/2),px(z1)+18,(x2-x1)*sk-8); }
   g.fillText('$',px(0),px(0)+5);
+  for(const c of KAMERAS){ g.fillStyle='#ff9a1f'; g.beginPath(); g.moveTo(px(c.x),px(c.z)); g.arc(px(c.x),px(c.z),14,Math.PI/2-c.dir-0.42,Math.PI/2-c.dir+0.42); g.closePath(); g.globalAlpha=0.55; g.fill(); g.globalAlpha=1; g.fillStyle='#2a2321'; g.fillRect(px(c.x)-3,px(c.z)-3,6,6); }
   for(const p of G.spieler.values()){ if(p.id!==G.meineId&&aktiv(p,0)) continue;
     g.fillStyle=hex(p.farbe); g.beginPath(); g.arc(px(p.x),px(p.z),p.id===G.meineId?7:5,0,7); g.fill(); g.lineWidth=2; g.strokeStyle='#2a2321'; g.stroke();
     if(p.id===G.meineId){ g.strokeStyle='#fff'; g.lineWidth=2.5; g.beginPath(); g.arc(px(p.x),px(p.z),11,0,7); g.stroke(); } }
@@ -2302,7 +2386,7 @@ function zurueckZumMenu(status=''){
 function starteDemo(){
   G.zeit=0;
   G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k));
-  G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k));
+  G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k)); G.kameras=neueKameras();
   G.items.clear(); for(let k=0;k<40;k++){ const p=zufallsPunktItem(0); neuesItem(zufallsTyp(p.x,p.z,p.e),p.x,p.z,false,p.e); }
 }
 
