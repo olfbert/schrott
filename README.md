@@ -6,6 +6,8 @@ Mehrspieler-Browserspiel: Schrott sammeln, an Robotern (rote Sichtkegel) und Dro
 - Mehrspieler per 4-stelligem Raumcode (PeerJS/WebRTC), am besten im selben WLAN
 - Spielen: über GitHub Pages öffnen (Settings → Pages → Branch `main`)
 
-Steuerung: Handy – links ziehen = laufen, Knöpfe rechts; PC – WASD, E = aufheben, F = schubsen, Q = ablegen, B = Laden, 1–3 = Fähigkeit, Mausrad = Zoom.
+Steuerung: Handy – links ziehen = laufen, Knöpfe rechts; PC – WASD, E = aufheben, F = schubsen, Q = ablegen, B = Laden, 1–3 = Fähigkeit, M = Karte, Mausrad = Zoom.
 
-Einstellungen (`KONFIG`), Karte (`OBST_BOXEN`) und eigene 3D-Modelle (`ASSETS`) stehen oben im Code.
+Karte: 80×80 m mit 8 Bereichen (Container-Terminal, Lagerhalle, Gerüst, Schrottplatz, Reifenlager, Werkstatt, Rohrlager, Fasslager) und oberer Etage über Rampen – je weiter draußen und je höher, desto wertvoller die Beute.
+
+Einstellungen (`KONFIG`), Karte (`KARTE`) und eigene 3D-Modelle (`ASSETS`) stehen oben im Code.
