@@ -8,6 +8,6 @@ Mehrspieler-Browserspiel: Schrott sammeln, an Robotern (rote Sichtkegel) und Dro
 
 Steuerung: Handy – links ziehen = laufen, Knöpfe rechts; PC – WASD, E = aufheben, F = schubsen, Q = ablegen, B = Laden, 1–3 = Fähigkeit, M = Karte, Mausrad = Zoom.
 
-Karte: 80×80 m mit 8 Bereichen (Container-Terminal, Lagerhalle, Gerüst, Schrottplatz, Reifenlager, Werkstatt, Rohrlager, Fasslager) und oberer Etage über Rampen – je weiter draußen und je höher, desto wertvoller die Beute.
+Karte: 80×80 m mit vier Biomen in den Ecken (Wald, See mit Insel und Brücke, Wüste mit Militärbasis, Beton-Hafen mit Containern), dazwischen Rasen mit Felsen, und oberer Etage über Rampen – je weiter draußen und je höher, desto wertvoller die Beute.
 
 Einstellungen (`KONFIG`), Karte (`KARTE`) und eigene 3D-Modelle (`ASSETS`) stehen oben im Code.
