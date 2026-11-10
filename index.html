@@ -109,6 +109,9 @@ input,select{font-family:inherit;font-size:20px;padding:6px 10px;border:3px soli
 .platz{font-family:'Bangers',sans-serif;font-size:24px;width:30px}
 .geldTxt{font-family:'Bangers',sans-serif;font-size:24px}
 label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
+.dauerReihe{display:flex;align-items:center;gap:8px}
+.dauerReihe input{flex:1;accent-color:#e5463b;height:28px;touch-action:manipulation;padding:0;border:none}
+.btn.mini{width:44px;flex:none;padding:2px 0;font-size:26px}
 
 @media (max-width:560px){ #rang{top:calc(env(safe-area-inset-top) + 62px);font-size:14px;min-width:96px} #uhr{font-size:26px} #geld{font-size:24px} }
 @keyframes pop{0%{transform:translate(-50%,-50%) scale(.4)}70%{transform:translate(-50%,-50%) scale(1.15)}100%{transform:translate(-50%,-50%) scale(1)}}
@@ -169,6 +172,7 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
     <div class="sub">Sammle Schrott, schleich an Robotern und Drohnen vorbei und verkauf alles am Ankauf. Wer am Ende das meiste Geld hat, gewinnt!</div>
     <label class="k" for="nameIn">Dein Name</label>
     <input id="nameIn" maxlength="14" autocomplete="off">
+    <div id="dauerStart"></div>
     <div class="reihe"><button class="btn" id="bSolo">Solo testen</button><button class="btn blau" id="bHost">Spiel hosten</button></div>
     <div class="reihe"><input id="codeIn" maxlength="4" placeholder="CODE" autocomplete="off"><button class="btn rosa" id="bJoin">Beitreten</button></div>
     <div id="status"></div>
@@ -185,8 +189,9 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
     <div class="sub" style="margin:0">Andere geben den Code unter „Beitreten“ ein.</div>
     <div class="liste" id="lobbyListe"></div>
     <div id="hostOpt">
-      <label class="k" for="dauerSel">Rundenlänge</label>
-      <select id="dauerSel"><option value="120">2 Minuten</option><option value="180">3 Minuten</option><option value="300">5 Minuten</option><option value="480" selected>8 Minuten</option><option value="720">12 Minuten</option></select>
+      <div id="dauerBlock"><label class="k" for="dauerIn">Rundenlänge: <b id="dauerTxt">8 Minuten</b></label>
+      <div class="dauerReihe"><button class="btn grau mini" id="dauerMinus">−</button><input type="range" id="dauerIn" min="1" max="30" step="1" value="8"><button class="btn grau mini" id="dauerPlus">+</button></div></div>
+
       <div class="reihe"><button class="btn" id="bStart">Runde starten</button></div>
     </div>
     <div id="clientWait" class="sub">Warte auf den Host …</div>
@@ -425,16 +430,16 @@ function bereichBei(x,z){
 /* Überwachungskameras: x,z = Standort, e = Etage, dir = Blickrichtung (0 = Süden, π/2 = Osten),
    schwenk = wie weit sie hin und her schwenkt. Sehen sie dich, schlagen sie Alarm und rufen Roboter & Drohnen. */
 const KAMERAS = [
-  {x:38.4,z:-27.5,e:0,dir:-1.571,schwenk:0.55},   // Container-Terminal, Gasse
+  {x:39,z:-27.5,e:0,dir:-1.571,schwenk:0.55},   // Container-Terminal, Gasse
   {x:21,z:-21,e:0,dir:2.356,schwenk:0.7},         // Eingang Container-Terminal
   {x:37,z:35,e:0,dir:-2.356,schwenk:0.5},         // in der Lagerhalle
   {x:37.4,z:22.6,e:1,dir:-0.785,schwenk:0.6},     // Hallendach
   {x:-21,z:21,e:0,dir:-0.785,schwenk:0.7},        // Gerüst
-  {x:-38.4,z:-28,e:0,dir:1.571,schwenk:0.6},      // Schrottplatz
-  {x:-6,z:-38.4,e:0,dir:0.2,schwenk:0.8},         // Reifenlager
-  {x:38.4,z:8,e:0,dir:-1.571,schwenk:0.7},        // Rohrlager
+  {x:-39,z:-28,e:0,dir:1.571,schwenk:0.6},      // Schrottplatz
+  {x:-6,z:-39,e:0,dir:0.2,schwenk:0.8},         // Reifenlager
+  {x:39,z:8,e:0,dir:-1.571,schwenk:0.7},        // Rohrlager
   {x:3,z:33,e:0,dir:-2.356,schwenk:0.5},          // in der Werkstatt
-  {x:-38.4,z:10,e:0,dir:1.571,schwenk:0.8},       // Fasslager
+  {x:-39,z:10,e:0,dir:1.571,schwenk:0.8},       // Fasslager
 ];
 const KAMERA_WEITE=11, KAMERA_WINKEL=24*Math.PI/180;
 // Wachposten der Roboter (Startpunkt + Revier, e = Etage)
@@ -1219,7 +1224,7 @@ function makeSpielerMesh(a){
 
 function makeRoboterMesh(){
   const g=new THREE.Group();
-  if(VORLAGEN.roboter){ const m=klonModell('roboter'); g.add(m); g.userData={kopf:m.getObjectByName('Kopf'), auge:null}; return g; }
+  if(VORLAGEN.roboter){ const m=klonModell('roboter'); g.add(m); const stapel=new THREE.Group(); stapel.position.set(0,1.4,-0.5); g.add(stapel); g.userData={kopf:m.getObjectByName('Kopf'), auge:null, stapel}; return g; }
   const weiss=toon(0xdfe2e4), grau=toon(0x6b727a), dunkel=toon(0x4a4f55);
   const kette=(x)=>{ const k=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.36,1.0), dunkel); k.position.set(x,0.2,0); g.add(k); };
   kette(-0.42); kette(0.42);
@@ -1235,17 +1240,35 @@ function makeRoboterMesh(){
   const auge=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.06,16), augeMatR); auge.rotation.x=Math.PI/2; auge.position.z=0.34; kopf.add(auge);
   const ant=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.4,5), dunkel); ant.position.set(0.22,0.4,-0.1); kopf.add(ant);
   const antK=new THREE.Mesh(new THREE.SphereGeometry(0.06,8,6), augeMatR); antK.position.set(0.22,0.62,-0.1); kopf.add(antK);
-  g.userData={kopf, auge:augeMatR};
+  const stapel=new THREE.Group(); stapel.position.set(0,1.38,-0.5); g.add(stapel);
+  g.userData={kopf, auge:augeMatR, stapel};
   schatten(g); return g;
 }
 
 function makeKameraMesh(k){
   const g=new THREE.Group(), y0=k.e*H1, B=new Bau();
-  const kante=Math.abs(k.x)>37||Math.abs(k.z)>37;
-  if(!kante) B.zyl(0.07,0.09,2.7,8,0x5f666d,k.x,y0+1.35,k.z).zyl(0.25,0.3,0.12,10,0x5f666d,k.x,y0+0.06,k.z);
-  else B.box(0.36,0.4,0.36,0x5f666d,k.x,y0+KONFIG.wandHoehe+0.2,k.z);
+  // nächste Wand in der Nähe suchen (nur unten) – sonst steht die Kamera auf einem Mast
+  let wand=null;
+  if(k.e===0) for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]) for(let t=0.25;t<=2.2;t+=0.25){
+    const c=zelle(k.x+dx*t,k.z+dz*t);
+    if(c<0||(sichtblock[0][c]&&rampeH[c]<0)){ if(!wand||t<wand.t) wand={dx,dz,t}; break; } }
+  let kopfY;
+  if(wand){
+    const rand=Math.abs(k.x+wand.dx*wand.t)>H-0.7||Math.abs(k.z+wand.dz*wand.t)>H-0.7;
+    // Wandfläche: am Außenzaun genau bei ±H, sonst am Rand der ersten belegten Zelle
+    let wx=k.x+wand.dx*(wand.t-0.2), wz=k.z+wand.dz*(wand.t-0.2);
+    if(rand){ if(wand.dx) wx=Math.sign(wand.dx)*H; else wz=Math.sign(wand.dz)*H; }
+    kopfY=y0+(rand?2.7:2.05);
+    const L=Math.hypot(wx-k.x,wz-k.z), mx=(wx+k.x)/2, mz=(wz+k.z)/2;
+    B.box(wand.dx?0.08:0.5,0.6,wand.dz?0.08:0.5,0x4f565d,wx,kopfY,wz);                         // Wandplatte
+    B.box(wand.dx?L:0.1,0.1,wand.dz?L:0.1,0x5f666d,mx,kopfY+0.05,mz);                          // Ausleger
+    B.box(wand.dx?L*0.7:0.06,0.06,wand.dz?L*0.7:0.06,0x5f666d,(wx*0.65+k.x*0.35),kopfY-0.25,(wz*0.65+k.z*0.35), 0, wand.dz?Math.sign(wand.dz)*0.5:0, wand.dx?-Math.sign(wand.dx)*0.5:0); // Strebe
+  } else {
+    kopfY=y0+3.0;
+    B.zyl(0.08,0.11,3.0,8,0x5f666d,k.x,y0+1.5,k.z).zyl(0.28,0.34,0.14,10,0x5f666d,k.x,y0+0.07,k.z).box(0.3,0.08,0.3,0x5f666d,k.x,kopfY+0.04,k.z);
+  }
   B.fertig(null);
-  const kopf=new THREE.Group(); kopf.position.set(k.x,y0+(kante?KONFIG.wandHoehe+0.55:2.85),k.z); kopf.scale.setScalar(1.5); g.add(kopf);
+  const kopf=new THREE.Group(); kopf.position.set(k.x,kopfY+0.3,k.z); kopf.scale.setScalar(1.5); g.add(kopf);
   const gehaeuse=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.28,0.62),toon(0xe9e6e0)); gehaeuse.position.z=0.18; kopf.add(gehaeuse);
   const schirm=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.05,0.72),toon(0xb9b4ac)); schirm.position.set(0,0.17,0.22); kopf.add(schirm);
   const linse=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,0.06,14),toon(0x2a2321)); linse.rotation.x=Math.PI/2; linse.position.z=0.5; kopf.add(linse);
@@ -1370,7 +1393,7 @@ const G = {
   itemId:1, itemsDirty:true, spawnT:0, endspurt:false
 };
 const ich = ()=>G.spieler.get(G.meineId);
-const ZST=['patrouille','pause','jagd','suche'], DZST=['kreisen','verfolgen','flucht'];
+const ZST=['patrouille','pause','jagd','suche','abliefern'], DZST=['kreisen','verfolgen','flucht'];
 
 function neuerSpieler(id,name,aussehen){
   // SPÄTER: Upgrades (Tempo, Rucksack, Tarnung …) verändern tempoMul / kapazitaet
@@ -1400,7 +1423,7 @@ function neuesItem(typ,x,z,pop,e=0){
   const p={x,z,e}; if(!punktFrei(x,z,e,0.3)) sichern(p,0.3);
   const it={id:G.itemId++,typ,x:p.x,z:p.z,e:p.e,pop:!!pop}; G.items.set(it.id,it); G.itemsDirty=true; return it;
 }
-function itemsGesamt(){ let n=G.items.size; for(const p of G.spieler.values()) n+=p.carry.length; for(const d of G.drohnen) if(d.traegt>=0) n++; return n; }
+function itemsGesamt(){ let n=G.items.size; for(const p of G.spieler.values()) n+=p.carry.length; for(const d of G.drohnen) if(d.traegt>=0) n++; for(const r of G.roboter) n+=(r.beute||[]).length; return n; }
 const aktiv = (p,i)=>!!p.effRest && p.effRest[i]>0;      // 0 unsichtbar, 1 Turbo, 2 stark
 const kap = p=>p.kapazitaet*(aktiv(p,2)?2:1);
 const ueberdeckt = p=>(p.e||0)===0 && ueberdacht[zelle(p.x,p.z)]===1;
@@ -1481,7 +1504,11 @@ function roboterTick(r,dt){
       break;
     case 'pause':
       r.kopf=Math.sin(t*1.6)*0.95;
-      r.pauseZeit-=dt; if(r.pauseZeit<=0){ r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,12); }
+      r.pauseZeit-=dt; if(r.pauseZeit<=0){ if((r.beute||[]).length){ r.zustand='abliefern'; r.ziel={x:r.heim.x,z:r.heim.z,e:r.heim.e}; } else { r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,12); } }
+      break;
+    case 'abliefern':
+      r.kopf=Math.sin(t*0.9)*0.4;
+      if(bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,KONFIG.roboterTempoPatrouille,dt,3)<1.2) beuteAbladen(r);
       break;
     case 'jagd': {
       r.kopf*=Math.pow(0.02,dt);
@@ -1495,7 +1522,7 @@ function roboterTick(r,dt){
     case 'suche': {
       const d=bewegeZu(r,r.ziel.x,r.ziel.z,r.ziel.e,KONFIG.roboterTempoSuche,dt,5);
       if(d<1.3){ r.kopf=Math.sin(t*2.6)*1.1; r.suchZeit-=dt; } else r.suchZeit-=dt*0.3;
-      if(r.suchZeit<=0){ r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,12); }
+      if(r.suchZeit<=0){ if((r.beute||[]).length){ r.zustand='abliefern'; r.ziel={x:r.heim.x,z:r.heim.z,e:r.heim.e}; } else { r.zustand='patrouille'; r.ziel=zielNahe(r.heim.x,r.heim.z,12); } }
       break; }
   }
   // Notausgang: steckt der Roboter fest, neu planen – und notfalls ein anderes Ziel nehmen
@@ -1504,12 +1531,17 @@ function roboterTick(r,dt){
     const dz=Math.hypot(r.ziel.x-r.x,r.ziel.z-r.z)+(r.ziel.e!==r.e?6:0);
     if(dz<r.bestD-0.3){ r.bestD=dz; r.steckT=0; } else r.steckT+=dt;
     if(r.steckT>2.5&&r.steckT-dt<=2.5){ r.pfad=null; r.pfadT=0; bewege(r,rnd(-0.3,0.3),rnd(-0.3,0.3),0.45); }
-    if(r.steckT>5){ r.steckT=0; r.bestD=1e9; if(r.zustand==='patrouille'){ r.zustand='pause'; r.pauseZeit=rnd(0.5,1.5); } else if(r.zustand==='suche') r.suchZeit=0; }
+    if(r.steckT>5){ r.steckT=0; r.bestD=1e9; if(r.zustand==='abliefern') beuteAbladen(r); else if(r.zustand==='patrouille'){ r.zustand='pause'; r.pauseZeit=rnd(0.5,1.5); } else if(r.zustand==='suche') r.suchZeit=0; }
   }
+}
+function beuteAbladen(r){
+  for(const typ of r.beute||[]){ const a=rnd(0,Math.PI*2), d=rnd(0.8,2.0); neuesItem(typ,r.x+Math.sin(a)*d,r.z+Math.cos(a)*d,true,r.e); }
+  r.beute=[]; r.zustand='pause'; r.pauseZeit=rnd(1,2);
 }
 function fangen(r,p){
   const n=p.carry.length;
-  p.carry.forEach(typ=>{ const a=rnd(0,Math.PI*2), d=rnd(1.0,2.6); neuesItem(typ,p.x+Math.sin(a)*d,p.z+Math.cos(a)*d,true,p.e||0); });
+  // der Roboter kassiert alles ein und bringt es später zu seinem Posten
+  r.beute=(r.beute||[]).concat(p.carry);
   p.carry=[];
   let strafe=0; if(KONFIG.strafeProzent>0){ strafe=Math.floor(p.geld*KONFIG.strafeProzent/100); p.geld-=strafe; }
   p.stunBis=G.zeit+KONFIG.betaeubung; p.schonBis=G.zeit+KONFIG.betaeubung+KONFIG.schonzeit;
@@ -1646,7 +1678,7 @@ function nutzen(p,i){
 
 /* ---------- Runde ---------- */
 function starteRunde(){
-  G.dauer=parseInt(document.getElementById('dauerSel').value)||300;
+  G.dauer=(parseInt(document.getElementById('dauerIn').value)||8)*60;
   G.restzeit=G.dauer; G.zeit=0; G.endspurt=false; G.items.clear(); G.spawnT=0;
   // jede Runde sieht jeder anders aus – und alle unterscheiden sich
   const vergeben=[];
@@ -1687,7 +1719,7 @@ function lokalesEreignis(e){
       if(!me || Math.hypot(me.x-x,me.z-z)<24) Sound.alarm();
       break; }
     case 'erwischt':
-      if(istIch){ zeigeMsg('ERWISCHT!', 'rot', e.n?`${e.n} Teil${e.n>1?'e':''} verloren`:''); Sound.erwischt(); wackeln=0.5; if(navigator.vibrate) navigator.vibrate(200); }
+      if(istIch){ zeigeMsg('ERWISCHT!', 'rot', e.n?`Roboter kassiert ${e.n} Teil${e.n>1?'e':''} ein`:''); Sound.erwischt(); wackeln=0.5; if(navigator.vibrate) navigator.vibrate(200); }
       else if(view) popup(view.position, 'erwischt!', 'rot');
       break;
     case 'verkauf':
@@ -1784,7 +1816,7 @@ function sendeItems(){ G.itemsDirty=false; itemSyncT=0; Netz.sendAlle({t:'i',l:[
 function sendeSnapshot(){
   Netz.sendAlle({t:'s',z:Math.round(G.restzeit*10)/10,
     p:[...G.spieler.values()].map(p=>[p.id,r2(p.x),r2(p.z),r2(p.rot),p.bewegt?1:0,G.zeit<p.stunBis?1:0,G.zeit<p.schonBis?1:0,p.geld,p.carry.join(','),G.zeit<p.fallBis?1:0,p.inventar.join(','),p.effRest.map(v=>Math.round(v*10)/10),p.e||0]),
-    r:G.roboter.map(r=>[r2(r.x),r2(r.z),r2(r.rot),r2(r.kopf),ZST.indexOf(r.zustand),r.e]),
+    r:G.roboter.map(r=>[r2(r.x),r2(r.z),r2(r.rot),r2(r.kopf),ZST.indexOf(r.zustand),r.e,(r.beute||[]).join(',')]),
     k:G.kameras.map(c=>[r2(c.ang),c.alarmT>0?1:0]),
     d:G.drohnen.map(d=>[r2(d.x),r2(d.y),r2(d.z),DZST.indexOf(d.zustand),d.traegt,r2(d.zustand==='verfolgen'?d.lockZeit/KONFIG.klauZeit:0)])});
 }
@@ -1843,7 +1875,7 @@ function clientEmpfang(d){
         if(e[0]!==G.meineId){ p.x=e[1]; p.z=e[2]; p.rot=e[3]; p.bewegt=e[4]; p.e=e[12]||0; p.y=hoeheBei(p.x,p.z,p.e); }
         p.stun=!!e[5]; p.schon=!!e[6]; p.geld=e[7]; p.carry=e[8]?e[8].split(',').map(Number):[]; p.fall=!!e[9]; p.inventar=e[10]?e[10].split(','):[]; p.effRest=e[11]||[0,0,0];
       }
-      d.r.forEach((e,i)=>{ let r=G.roboter[i]; if(!r) r=G.roboter[i]={i}; r.x=e[0]; r.z=e[1]; r.rot=e[2]; r.kopf=e[3]; r.zustand=ZST[e[4]]; r.e=e[5]||0; r.y=hoeheBei(r.x,r.z,r.e); });
+      d.r.forEach((e,i)=>{ let r=G.roboter[i]; if(!r) r=G.roboter[i]={i}; r.x=e[0]; r.z=e[1]; r.rot=e[2]; r.kopf=e[3]; r.zustand=ZST[e[4]]; r.e=e[5]||0; r.beute=e[6]?e[6].split(',').map(Number):[]; r.y=hoeheBei(r.x,r.z,r.e); });
       G.roboter.length=d.r.length;
       d.d.forEach((e,i)=>{ let o=G.drohnen[i]; if(!o) o=G.drohnen[i]={i}; o.x=e[0]; o.y=e[1]; o.z=e[2]; o.zustand=DZST[e[3]]; o.traegt=e[4]; o.prog=e[5]; });
       G.drohnen.length=d.d.length;
@@ -2100,6 +2132,8 @@ function syncViews(dt,uhr){
     u.uAlpha.value = jagd ? 0.42+Math.sin(uhr*12)*0.08 : suche ? 0.34 : (r.zustand==='pause'&&G.modus==='spiel'?0.26:0.27);
     if(ud.auge) ud.auge.color.setHex(jagd&&Math.floor(uhr*8)%2?0xffd23f:0xff3b30);
     ud.alarmT=Math.max(0,(ud.alarmT||0)-dt);
+    const bk=(r.beute||[]).join(',');
+    if(bk!==ud.beuteKey&&ud.stapel){ ud.beuteKey=bk; ud.stapel.clear(); let yy=0; (r.beute||[]).forEach((typ,j)=>{ const m=makeItemMesh(typ); m.scale.multiplyScalar(0.5); m.position.y=yy; m.rotation.y=j*1.1; ud.stapel.add(m); yy+=0.1+ITEMS[typ].gewicht*0.05; }); }
     ud.lbl.textContent = jagd?'!':'?';
     ud.lbl.className='lbl '+(jagd?'alarm':'frage');
     setzeLabel(ud.lbl,v.position.x,v.position.y+2.75+(ud.alarmT>0?Math.sin(ud.alarmT*20)*0.1:0),v.position.z,(jagd||suche)&&G.modus==='spiel');
@@ -2114,7 +2148,7 @@ function syncViews(dt,uhr){
     updateKegel(ud.kegel,c.x+Math.sin(ud.ang)*0.4,c.z+Math.cos(ud.ang)*0.4,ud.ang,c.e,c.e*H1,KAMERA_WEITE,KAMERA_WINKEL);
     const u=ud.kegel.material.uniforms; u.uZeit.value=uhr; u.uCol.value.setHex(alarm&&Math.floor(uhr*6)%2?0xff2b22:0xff9a1f); u.uAlpha.value=alarm?0.42:0.24;
     ud.ledMat.color.setHex(alarm?(Math.floor(uhr*8)%2?0xffd23f:0xff2b22):(Math.floor(uhr*1.5)%2?0xff3b30:0x5a1a16));
-    setzeLabel(ud.lbl,c.x,c.e*H1+3.6,c.z,alarm&&G.modus==='spiel'); });
+    setzeLabel(ud.lbl,c.x,ud.kopf.position.y+0.9,c.z,alarm&&G.modus==='spiel'); });
 
   // ----- Drohnen
   while(VIEWS.drohnen.length<G.drohnen.length){
@@ -2351,7 +2385,7 @@ function listeFuellen(el,spieler,mitGeld){
   });
 }
 function zeigeLobby(){
-  zeigeScreen('lobby');
+  zeigeScreen('lobby'); $('hostOpt').prepend($('dauerBlock'));
   // Spieler stellen sich in der Lobby rund um die Hütte auf
   let i=0; const n=G.spieler.size||1;
   for(const p of G.spieler.values()){ const a=(i++/n)*Math.PI*2+Math.PI/2; p.x=Math.cos(a)*3.1; p.z=Math.sin(a)*3.1; p.rot=Math.atan2(p.x,p.z); }
@@ -2381,7 +2415,7 @@ function zurueckZumMenu(status=''){
   G.istHost=true; G.online=false; G.modus='menu';
   Netz.stop(); aufraeumen(); G.meineId='host';
   starteDemo();
-  zeigeScreen('start'); $('status').textContent=status;
+  zeigeScreen('start'); $('dauerStart').appendChild($('dauerBlock')); $('status').textContent=status;
 }
 function starteDemo(){
   G.zeit=0;
@@ -2430,6 +2464,14 @@ $('bStart').onclick=()=>{ Sound.init(); starteRunde(); };
 $('bLeave').onclick=()=>zurueckZumMenu();
 $('bMenu').onclick=()=>zurueckZumMenu();
 $('bNochmal').onclick=()=>{ Sound.init(); starteRunde(); };
+// Rundenlänge 1–30 Minuten frei einstellbar (wird gemerkt)
+const dauerIn=$('dauerIn');
+function zeigeDauer(){ const m=+dauerIn.value; $('dauerTxt').textContent=m+(m===1?' Minute':' Minuten'); try{ localStorage.setItem('schrott_dauer',m); }catch(_){} }
+try{ const m=+localStorage.getItem('schrott_dauer'); if(m>=1&&m<=30) dauerIn.value=m; }catch(_){}
+dauerIn.addEventListener('input',zeigeDauer);
+$('dauerMinus').onclick=()=>{ dauerIn.value=Math.max(1,+dauerIn.value-1); zeigeDauer(); };
+$('dauerPlus').onclick=()=>{ dauerIn.value=Math.min(30,+dauerIn.value+1); zeigeDauer(); };
+zeigeDauer();
 $('codeIn').addEventListener('keydown',e=>{ if(e.key==='Enter') $('bJoin').click(); });
 
 /* =====================================================================
@@ -2476,6 +2518,7 @@ Promise.all([ladeAssets(), Promise.race([document.fonts?document.fonts.ready:Pro
   baueStation();
   baueKarte();
   baueNav();
+  $('dauerStart').appendChild($('dauerBlock'));
   starteDemo();
   zeigeScreen('start');
   requestAnimationFrame(schleife);
