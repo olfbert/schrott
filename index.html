@@ -18,6 +18,19 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--sky);touch-actio
 canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 #touch{position:fixed;inset:0;touch-action:none}
 .hidden{display:none!important}
+#rauch{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#slots{position:absolute;left:calc(env(safe-area-inset-left) + 12px);top:calc(env(safe-area-inset-top) + 168px);display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.rund.slot{position:relative;width:56px;height:56px;font-size:28px;background:#fff;pointer-events:auto}
+.slotNr{position:absolute;right:-4px;bottom:-4px;font-size:12px;background:var(--ink);color:#fff;border-radius:8px;padding:1px 5px;font-family:'Patrick Hand',sans-serif}
+#btnLaden{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 58px);pointer-events:auto;font-size:22px;padding:4px 16px;border:3px solid var(--ink);border-radius:12px;background:var(--gelb);box-shadow:3px 3px 0 var(--ink);color:var(--ink);animation:puls .9s infinite}
+#laden{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);width:min(400px,94vw);max-height:88vh;overflow:auto;padding:12px 14px;pointer-events:auto;text-align:center;touch-action:pan-y}
+.ware{display:flex;align-items:center;gap:10px;text-align:left;border-top:2px dashed var(--ink);padding:7px 0}
+.wareIcon{font-size:32px;width:40px;text-align:center}
+.wareText{flex:1;line-height:1.1}.wareText small{display:block;font-size:14px;opacity:.85}
+.btn.wareBtn{width:auto;font-size:20px;padding:4px 10px}
+.btn:disabled{opacity:.4}
+#effekte{font-size:18px;padding:2px 10px}
+.lbl.effi{font-size:20px}
 .panel{background:var(--paper);border:3px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink)}
 .comic{font-family:'Bangers','Impact',sans-serif;letter-spacing:1px}
 
@@ -110,6 +123,7 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
 <canvas id="c"></canvas>
 <div id="touch"></div>
 <div id="labels"></div>
+<canvas id="rauch" class="hidden"></canvas>
 
 <div id="hud" class="hidden">
   <div id="links">
@@ -119,10 +133,19 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
       <div id="packLast"><div id="packBar"></div></div>
       <div id="packTxt">Rucksack 0/8 kg</div>
     </div>
+    <div id="effekte" class="panel comic hidden"></div>
   </div>
   <div id="uhr" class="panel comic">5:00</div>
   <div id="rang" class="panel"></div>
   <div id="msg" class="comic"></div>
+  <div id="slots"></div>
+  <button id="btnLaden" class="comic hidden">🛒 LADEN</button>
+  <div id="laden" class="panel hidden">
+    <h2>Laden</h2>
+    <div id="ladenGeld" class="sub" style="margin:0 0 6px"></div>
+    <div id="ladenListe"></div>
+    <div class="reihe"><button class="btn grau" id="bLadenZu">Schließen</button></div>
+  </div>
   <div id="tipp">Links ziehen = laufen · hinter Wänden verstecken · Ankauf = sicher</div>
   <button id="btnZoom" class="rund">⊕</button>
   <button id="btnAb" class="rund hidden">AB-<br>LEGEN</button>
@@ -141,7 +164,7 @@ label.k{display:block;text-align:left;font-size:16px;margin:8px 0 2px}
     <div class="reihe"><input id="codeIn" maxlength="4" placeholder="CODE" autocomplete="off"><button class="btn rosa" id="bJoin">Beitreten</button></div>
     <div id="status"></div>
     <div class="hilfe">
-      <b>Steuerung:</b> Handy: links ziehen = laufen, Knopf rechts = aufheben, Zwei-Finger-Zoom. PC: WASD/Pfeile, E/Leertaste = aufheben, F = schubsen, Q = ablegen, Mausrad = Zoom.<br><b>Schubsen:</b> Wer geschubst wird, fällt kurz hin und verliert ein Teil – Roboter können ihn dann schnappen!<br>
+      <b>Steuerung:</b> Handy: links ziehen = laufen, Knopf rechts = aufheben, Zwei-Finger-Zoom. PC: WASD/Pfeile, E/Leertaste = aufheben, F = schubsen, Q = ablegen, Mausrad = Zoom.<br><b>Laden:</b> Am Ankauf kannst du mit deinem Geld Fähigkeiten kaufen (Unsichtbarkeit, Rauchwolke, Turbo, Muskelkraft) und sie später einsetzen (PC: 1–3, B = Laden). Ausgegebenes Geld zählt nicht mehr zum Sieg!<br><b>Schubsen:</b> Wer geschubst wird, fällt kurz hin und verliert ein Teil – Roboter können ihn dann schnappen!<br>
       <b>Gefahren:</b> Rote Kegel = Sicht der Roboter. Rote Kreise = Drohnen-Scanner – bleibst du drin, klaut die Drohne dein wertvollstes Teil. Erwischt dich ein Roboter, verlierst du alles, was du trägst. Hinter Wänden sehen dich Roboter nicht – Drohnen fliegen aber drüber. In der Ankauf-Zone bist du sicher.
     </div>
   </div>
@@ -218,6 +241,17 @@ const KONFIG = {
 };
 
 // Schrott-Sorten: Wert in $, Gewicht in kg, Häufigkeit (relativ)
+/* Fähigkeiten aus dem Laden (an der Ankauf-Station). Einmalig nutzbar, max. 3 im Inventar.
+   slot: 0 = Unsichtbar, 1 = Turbo, 2 = Stark (zeitlich begrenzte Effekte), -1 = sofortige Wirkung */
+const FAEHIGKEITEN = [
+  { key:'unsicht', name:'Unsichtbarkeit', icon:'👻', preis:120, dauer:15, slot:0, text:'15 s unsichtbar – für Roboter, Drohnen und Mitspieler' },
+  { key:'rauch',   name:'Rauchwolke',     icon:'💨', preis:80,  dauer:9,  slot:-1, text:'Alle anderen Spieler sehen 9 s lang fast nichts' },
+  { key:'tempo',   name:'Turbo',          icon:'⚡', preis:60,  dauer:15, slot:1, text:'15 s deutlich schneller laufen' },
+  { key:'stark',   name:'Muskelkraft',    icon:'💪', preis:70,  dauer:15, slot:2, text:'15 s doppelt so viel tragen, Schubser werfen weiter und betäuben länger' },
+];
+const INVENTAR_MAX = 3;
+const TURBO_FAKTOR = 1.6, STARK_SCHUBS_STUN = 2.5, STARK_SCHUBS_WEG = 3.4;
+
 const ITEMS = [
   { key:'schraube', name:'Schraube',  wert:5,  gewicht:1, haeufig:10,  farbe:0xb9bec4 },
   { key:'dose',     name:'Blechdose', wert:8,  gewicht:1, haeufig:9,   farbe:0xdba45c },
@@ -436,6 +470,7 @@ const Sound = {
   ablegen(){ this.ton(320,0.12,'triangle',0.22,0.55); },
   schubs(){ this.ton(180,0.12,'square',0.2,0.5); this.ton(90,0.25,'triangle',0.25,0.6,0.05); },
   luft(){ this.ton(600,0.12,'sine',0.12,0.4); },
+  faehigkeit(){ this.ton(330,0.35,'triangle',0.2,3); this.ton(660,0.3,'sine',0.12,2,0.1); },
   start(){ [392,523,659].forEach((f,i)=>this.ton(f,0.18,'square',0.1,1,i*0.1)); },
   ende(){ [523,659,784,1046].forEach((f,i)=>this.ton(f,0.25,'square',0.11,1,i*0.12)); },
   tick(){ this.ton(1400,0.04,'square',0.06); }
@@ -962,7 +997,7 @@ const ZST=['patrouille','pause','jagd','suche'], DZST=['kreisen','verfolgen','fl
 
 function neuerSpieler(id,name,aussehen){
   // SPÄTER: Upgrades (Tempo, Rucksack, Tarnung …) verändern tempoMul / kapazitaet
-  return {id,name,aussehen,farbe:aussehen?aussehen.k:0xcccccc,fallBis:0,fallLokalBis:0,fall:false,schubsBereit:0,schubsSchutz:0,kbx:0,kbz:0,x:0,z:3,rot:0,bewegt:0,carry:[],geld:0,stunBis:0,schonBis:0,stun:false,schon:false,tempoMul:1,kapazitaet:KONFIG.rucksack,verkaufT:0};
+  return {id,name,aussehen,farbe:aussehen?aussehen.k:0xcccccc,fallBis:0,fallLokalBis:0,fall:false,schubsBereit:0,schubsSchutz:0,kbx:0,kbz:0,x:0,z:3,rot:0,bewegt:0,carry:[],geld:0,stunBis:0,schonBis:0,stun:false,schon:false,tempoMul:1,kapazitaet:KONFIG.rucksack,verkaufT:0,inventar:[],effBis:[0,0,0],effRest:[0,0,0]};
 }
 
 function neuerRoboter(i){
@@ -984,10 +1019,13 @@ function neuesItem(typ,x,z,pop){
   const it={id:G.itemId++,typ,x:p.x,z:p.z,pop:!!pop}; G.items.set(it.id,it); G.itemsDirty=true; return it;
 }
 function itemsGesamt(){ let n=G.items.size; for(const p of G.spieler.values()) n+=p.carry.length; for(const d of G.drohnen) if(d.traegt>=0) n++; return n; }
-const zielbar = p=>G.zeit>=p.schonBis && G.zeit>=p.stunBis && !inZone(p.x,p.z);
+const aktiv = (p,i)=>!!p.effRest && p.effRest[i]>0;      // 0 unsichtbar, 1 Turbo, 2 stark
+const kap = p=>p.kapazitaet*(aktiv(p,2)?2:1);
+const zielbar = p=>G.zeit>=p.schonBis && G.zeit>=p.stunBis && !inZone(p.x,p.z) && !aktiv(p,0);
 
 /* ---------- Host-Simulation ---------- */
 function hostTick(dt){
+  for(const p of G.spieler.values()) p.effRest=p.effBis.map(b=>Math.max(0,b-G.zeit));
   if(G.modus==='spiel'){
     G.restzeit-=dt;
     if(!G.endspurt && G.restzeit<=30){ G.endspurt=true; ereignis({k:'endspurt'}); }
@@ -1137,7 +1175,7 @@ function aufheben(p){
   let best=null, bd=KONFIG.aufhebRadius;
   for(const it of G.items.values()){ const d=Math.hypot(it.x-p.x,it.z-p.z); if(d<bd){ bd=d; best=it; } }
   if(!best) return;
-  if(gewicht(p.carry)+ITEMS[best.typ].gewicht>p.kapazitaet){ ereignis({k:'voll',id:p.id}); return; }
+  if(gewicht(p.carry)+ITEMS[best.typ].gewicht>kap(p)){ ereignis({k:'voll',id:p.id}); return; }
   G.items.delete(best.id); G.itemsDirty=true; p.carry.push(best.typ);
   ereignis({k:'auf',id:p.id,typ:best.typ});
 }
@@ -1164,10 +1202,29 @@ function schubsen(p){
   }
   if(!best){ ereignis({k:'luft',id:p.id}); return; }
   const d=Math.hypot(best.x-p.x,best.z-p.z)||1, ux=(best.x-p.x)/d, uz=(best.z-p.z)/d;
-  best.fallBis=G.zeit+KONFIG.schubsStun; best.schubsSchutz=G.zeit+KONFIG.schubsStun+KONFIG.schubsSchutz;
+  const stark=aktiv(p,2), stunD=stark?STARK_SCHUBS_STUN:KONFIG.schubsStun, weg=stark?STARK_SCHUBS_WEG:KONFIG.schubsWeg;
+  best.fallBis=G.zeit+stunD; best.schubsSchutz=G.zeit+stunD+KONFIG.schubsSchutz;
   let typ=-1;
   if(best.carry.length){ typ=best.carry.pop(); neuesItem(typ,best.x+ux*1.6+rnd(-0.5,0.5),best.z+uz*1.6+rnd(-0.5,0.5),true); }
-  ereignis({k:'schubs',id:best.id,von:p.id,ux:r2(ux),uz:r2(uz),typ});
+  ereignis({k:'schubs',id:best.id,von:p.id,ux:r2(ux),uz:r2(uz),typ,s:stunD,w:weg});
+}
+
+function kaufen(p,key){
+  const F=FAEHIGKEITEN.find(f=>f.key===key);
+  if(!p||!F||G.modus!=='spiel') return;
+  if(!inZone(p.x,p.z)){ ereignis({k:'kaufNein',id:p.id,g:'Nur am Ankauf!'}); return; }
+  if(p.inventar.length>=INVENTAR_MAX){ ereignis({k:'kaufNein',id:p.id,g:'Inventar voll!'}); return; }
+  if(p.geld<F.preis){ ereignis({k:'kaufNein',id:p.id,g:'Zu wenig Geld!'}); return; }
+  p.geld-=F.preis; p.inventar.push(key);
+  ereignis({k:'kauf',id:p.id,key});
+}
+function nutzen(p,i){
+  if(!p||G.modus!=='spiel'||G.zeit<p.stunBis) return;
+  const key=p.inventar[i], F=FAEHIGKEITEN.find(f=>f.key===key); if(!F) return;
+  p.inventar.splice(i,1);
+  if(F.slot>=0) p.effBis[F.slot]=Math.max(p.effBis[F.slot],G.zeit)+F.dauer;
+  p.effRest=p.effBis.map(b=>Math.max(0,b-G.zeit));
+  ereignis({k:'nutze',id:p.id,key});
 }
 
 /* ---------- Runde ---------- */
@@ -1180,7 +1237,7 @@ function starteRunde(){
   let i=0; const n=G.spieler.size;
   for(const p of G.spieler.values()){
     const a=(i/n)*Math.PI*2+Math.PI/2; p.x=Math.cos(a)*3.1; p.z=Math.sin(a)*3.1; p.rot=Math.atan2(p.x,p.z);
-    p.carry=[]; p.geld=0; p.stunBis=0; p.schonBis=0; p.fallBis=0; p.fallLokalBis=0; p.schubsBereit=0; p.schubsSchutz=0; p.kbx=p.kbz=0; p.verkaufT=0; i++;
+    p.carry=[]; p.geld=0; p.stunBis=0; p.schonBis=0; p.fallBis=0; p.fallLokalBis=0; p.schubsBereit=0; p.schubsSchutz=0; p.kbx=p.kbz=0; p.verkaufT=0; p.inventar=[]; p.effBis=[0,0,0]; p.effRest=[0,0,0]; i++;
   }
   G.roboter=[]; for(let k=0;k<KONFIG.roboterAnzahl;k++) G.roboter.push(neuerRoboter(k));
   G.drohnen=[]; for(let k=0;k<KONFIG.drohnenAnzahl;k++) G.drohnen.push(neueDrohne(k));
@@ -1228,14 +1285,22 @@ function lokalesEreignis(e){
       else if(view) popup(view.position, 'geklaut!', 'rot');
       break;
     case 'endspurt': zeigeMsg('ENDSPURT!','gelb','noch 30 Sekunden',1.6); Sound.alarm(); break;
+    case 'kauf': { const F=FAEHIGKEITEN.find(f=>f.key===e.key); if(istIch&&F){ zeigeMsg(F.icon+' '+F.name,'gelb','gekauft',1.1); Sound.verkauf(); } break; }
+    case 'kaufNein': if(istIch){ zeigeMsg(e.g,'rot','',1.1); Sound.voll(); } break;
+    case 'nutze': {
+      const F=FAEHIGKEITEN.find(f=>f.key===e.key); if(!F) break;
+      if(istIch){ zeigeMsg(F.icon+' '+F.name.toUpperCase()+'!','gelb',F.slot<0?(G.spieler.size>1?'Die anderen sehen nichts mehr':'(keine Mitspieler da)'):F.dauer+' Sekunden',1.4); Sound.faehigkeit(); }
+      else if(F.key==='rauch'){ starteRauch(F.dauer); zeigeMsg('RAUCH!','rot',(G.spieler.get(e.id)?.name||'Jemand')+' vernebelt dir die Sicht',1.6); Sound.klau(); }
+      else if(F.key!=='unsicht' && view) popup(view.position,F.icon);
+      break; }
     case 'luft': { const v=VIEWS.spieler.get(e.id); if(v) v.userData.schubsT=0.3; if(istIch) Sound.luft(); break; }
     case 'schubs': {
       const vv=VIEWS.spieler.get(e.von); if(vv) vv.userData.schubsT=0.3;
       const tp=G.spieler.get(e.id); if(tp) tp.rot=Math.atan2(e.ux,e.uz);   // fällt in Schubsrichtung
       if(view) view.rotation.y=Math.atan2(e.ux,e.uz);
       if(istIch && me){
-        const v0=KONFIG.schubsWeg*6; me.kbx=e.ux*v0; me.kbz=e.uz*v0;
-        me.fallLokalBis=uhr+KONFIG.schubsStun; me.rot=Math.atan2(e.ux,e.uz);
+        const v0=(e.w||KONFIG.schubsWeg)*6; me.kbx=e.ux*v0; me.kbz=e.uz*v0;
+        me.fallLokalBis=uhr+(e.s||KONFIG.schubsStun); me.rot=Math.atan2(e.ux,e.uz);
         zeigeMsg('GESCHUBST!','gelb',e.typ>=0?`${ITEMS[e.typ].name} verloren`:'',1.3); wackeln=0.35;
         if(navigator.vibrate) navigator.vibrate(120);
       } else if(view) popup(view.position, e.typ>=0?'Schubs! −1 Teil':'Schubs!');
@@ -1296,7 +1361,7 @@ let itemSyncT=0;
 function sendeItems(){ G.itemsDirty=false; itemSyncT=0; Netz.sendAlle({t:'i',l:[...G.items.values()].map(i=>[i.id,i.typ,r2(i.x),r2(i.z),i.pop?1:0])}); for(const i of G.items.values()) i.pop=false; }
 function sendeSnapshot(){
   Netz.sendAlle({t:'s',z:Math.round(G.restzeit*10)/10,
-    p:[...G.spieler.values()].map(p=>[p.id,r2(p.x),r2(p.z),r2(p.rot),p.bewegt?1:0,G.zeit<p.stunBis?1:0,G.zeit<p.schonBis?1:0,p.geld,p.carry.join(','),G.zeit<p.fallBis?1:0]),
+    p:[...G.spieler.values()].map(p=>[p.id,r2(p.x),r2(p.z),r2(p.rot),p.bewegt?1:0,G.zeit<p.stunBis?1:0,G.zeit<p.schonBis?1:0,p.geld,p.carry.join(','),G.zeit<p.fallBis?1:0,p.inventar.join(','),p.effRest.map(v=>Math.round(v*10)/10)]),
     r:G.roboter.map(r=>[r2(r.x),r2(r.z),r2(r.rot),r2(r.kopf),ZST.indexOf(r.zustand)]),
     d:G.drohnen.map(d=>[r2(d.x),r2(d.y),r2(d.z),DZST.indexOf(d.zustand),d.traegt,r2(d.zustand==='verfolgen'?d.lockZeit/KONFIG.klauZeit:0)])});
 }
@@ -1321,6 +1386,8 @@ function hostEmpfang(id,d){
     case 'auf': aufheben(p); break;
     case 'ab': ablegen(p); break;
     case 'schubs': schubsen(p); break;
+    case 'kauf': kaufen(p,String(d.key)); break;
+    case 'nutze': nutzen(p,d.i|0); break;
   }
 }
 function spielerWeg(id){
@@ -1351,7 +1418,7 @@ function clientEmpfang(d){
       for(const e of d.p){
         const p=G.spieler.get(e[0]); if(!p) continue;
         if(e[0]!==G.meineId){ p.x=e[1]; p.z=e[2]; p.rot=e[3]; p.bewegt=e[4]; }
-        p.stun=!!e[5]; p.schon=!!e[6]; p.geld=e[7]; p.carry=e[8]?e[8].split(',').map(Number):[]; p.fall=!!e[9];
+        p.stun=!!e[5]; p.schon=!!e[6]; p.geld=e[7]; p.carry=e[8]?e[8].split(',').map(Number):[]; p.fall=!!e[9]; p.inventar=e[10]?e[10].split(','):[]; p.effRest=e[11]||[0,0,0];
       }
       d.r.forEach((e,i)=>{ let r=G.roboter[i]; if(!r) r=G.roboter[i]={i}; r.x=e[0]; r.z=e[1]; r.rot=e[2]; r.kopf=e[3]; r.zustand=ZST[e[4]]; });
       G.roboter.length=d.r.length;
@@ -1411,6 +1478,8 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyE'||e.code==='Space'){ aktionAuf(); e.preventDefault(); }
   if(e.code==='KeyQ') aktionAb();
   if(e.code==='KeyF') aktionSchubs();
+  if(e.code==='Digit1'||e.code==='Digit2'||e.code==='Digit3') aktionNutze(+e.code.slice(5)-1);
+  if(e.code==='KeyB'){ if(ladenOffen) ladenZu(); else ladenAuf(); }
 });
 addEventListener('keyup',e=>{ tasten[e.code]=false; });
 addEventListener('blur',()=>{ for(const k in tasten) tasten[k]=false; });
@@ -1423,6 +1492,8 @@ const ZOOMSTUFEN=[0.1,0.3,0.6,0.9];
 knopf('btnZoom',()=>{ const i=ZOOMSTUFEN.findIndex(z=>z>kam.zoom+0.05); kam.zoom=ZOOMSTUFEN[i<0?0:i]; });
 function aktionAuf(){ if(G.istHost) aufheben(ich()); else Netz.sendHost({t:'auf'}); }
 function aktionAb(){ if(G.istHost) ablegen(ich()); else Netz.sendHost({t:'ab'}); }
+function aktionKauf(key){ if(G.istHost) kaufen(ich(),key); else Netz.sendHost({t:'kauf',key}); }
+function aktionNutze(i){ const me=ich(); if(G.modus!=='spiel'||!me||!me.inventar[i]) return; if(G.istHost) nutzen(me,i); else Netz.sendHost({t:'nutze',i}); }
 let schubsLokalBereit=0;
 function aktionSchubs(){
   if(G.modus!=='spiel'||uhr<schubsLokalBereit) return;
@@ -1457,7 +1528,7 @@ function lokalBewegen(dt){
   let ix=eingabe.x, iz=eingabe.z; const m=Math.hypot(ix,iz);
   if(m>1){ ix/=m; iz/=m; }
   if(stun||m<0.12){ p.bewegt=0; return; }
-  const tempo=KONFIG.spielerTempo*p.tempoMul*Math.max(0.35,1-KONFIG.gewichtsBremse*gewicht(p.carry));
+  const tempo=KONFIG.spielerTempo*p.tempoMul*(aktiv(p,1)?TURBO_FAKTOR:1)*Math.max(0.35,1-KONFIG.gewichtsBremse*(aktiv(p,2)?0.5:1)*gewicht(p.carry));
   p.x+=ix*tempo*dt; p.z+=iz*tempo*dt; kollidiere(p,0.42);
   p.bewegt=Math.min(1,m); p.rot=turnTo(p.rot,Math.atan2(ix,iz),14*dt);
 }
@@ -1492,17 +1563,26 @@ ichRing.rotation.x=-Math.PI/2; ichRing.position.y=0.035; ichRing.renderOrder=4; 
 let naechstes=null;
 
 const kSmooth=(dt,s)=>1-Math.exp(-dt*s);
+// Halbdurchsichtige "Geist"-Darstellung der eigenen Figur bei Unsichtbarkeit
+const geistCache=new Map();
+function geistMat(m){ let g=geistCache.get(m); if(!g){ g=m.clone(); g.transparent=true; g.opacity=0.3; g.depthWrite=false; geistCache.set(m,g); } return g; }
+function setzeGeist(v,an){
+  if(v.userData.geist===an) return; v.userData.geist=an;
+  v.traverse(o=>{ if(!o.isMesh) return;
+    if(an){ if(!o.userData.orig) o.userData.orig=o.material; o.material=Array.isArray(o.userData.orig)?o.userData.orig.map(geistMat):geistMat(o.userData.orig); fxObjekte.add(o); o.castShadow=false; }
+    else { if(o.userData.orig){ o.material=o.userData.orig; o.userData.orig=null; } fxObjekte.delete(o); o.castShadow=true; } });
+}
 function syncViews(dt,uhr){
   const k=kSmooth(dt,G.istHost?22:12);
   // ----- Spieler
   for(const [id,p] of G.spieler){
     let v=VIEWS.spieler.get(id);
     const lookKey=JSON.stringify(p.aussehen||{})+p.name;
-    if(v && v.userData.lookKey!==lookKey){ scene.remove(v); v.userData.name.remove(); v.userData.stunL.remove(); VIEWS.spieler.delete(id); v=null; }
+    if(v && v.userData.lookKey!==lookKey){ scene.remove(v); v.userData.name.remove(); v.userData.stunL.remove(); v.userData.effL.remove(); VIEWS.spieler.delete(id); v=null; }
     if(!v){
       v=makeSpielerMesh(p.aussehen||neuesAussehen([])); v.position.set(p.x,0,p.z); v.rotation.y=p.rot;
       const nl=makeLabel('name',''); const dot=document.createElement('span'); dot.className='dot'; dot.style.background=hex(p.farbe); dot.style.marginRight='4px'; nl.append(dot,p.name);
-      Object.assign(v.userData,{name:nl,stunL:makeLabel('stun','💫'),carryKey:'',phase:0,lookKey,fallW:0,schubsT:0});
+      Object.assign(v.userData,{name:nl,stunL:makeLabel('stun','💫'),effL:makeLabel('effi',''),carryKey:'',phase:0,lookKey,fallW:0,schubsT:0,skal:1,geist:false});
       scene.add(v); VIEWS.spieler.set(id,v);
     }
     const lokal=id===G.meineId;
@@ -1526,16 +1606,26 @@ function syncViews(dt,uhr){
     v.rotation.x=ud.fallW*1.42; v.position.y=ud.fallW*0.22;
     v.rotation.z = stun ? Math.sin(uhr*14)*0.18 : 0;
     v.visible = !(schon&&!stun) || Math.floor(uhr*10)%2===0;
+    // Fähigkeiten: unsichtbar (für andere ganz weg, für dich als Geist), stark = größer
+    const unsicht=aktiv(p,0), versteckt=unsicht&&!lokal;
+    if(lokal) setzeGeist(v,unsicht);
+    if(versteckt) v.visible=false;
+    ud.skal=lerp(ud.skal,aktiv(p,2)?1.22:1,kSmooth(dt,8)); v.scale.setScalar(ud.skal);
+    const effTxt=(aktiv(p,1)?'⚡':'')+(aktiv(p,2)?'💪':'')+(lokal&&unsicht?'👻':'');
+    if(ud.effL.textContent!==effTxt) ud.effL.textContent=effTxt;
     // getragene Teile auf dem Rucksack
     const key=p.carry.join(',');
     if(key!==ud.carryKey){
       ud.carryKey=key; ud.stack.clear(); let y=0;
       p.carry.forEach((typ,i)=>{ const m=makeItemMesh(typ); m.scale.multiplyScalar(0.45); m.position.y=y; m.rotation.y=i*1.3; ud.stack.add(m); y+=0.08+ITEMS[typ].gewicht*0.045; });
+      if(ud.geist){ setzeGeist(v,false); setzeGeist(v,true); }
     }
-    setzeLabel(ud.name,v.position.x,lerp(2.15+(p.carry.length?0.25+p.carry.length*0.05:0),1.1,ud.fallW),v.position.z, G.modus!=='menu');
-    setzeLabel(ud.stunL,v.position.x+(liegt?Math.sin(v.rotation.y)*1.2:0),liegt?1.0:2.7,v.position.z+(liegt?Math.cos(v.rotation.y)*1.2:0),stun||liegt);
+    const nameY=lerp(2.15+(p.carry.length?0.25+p.carry.length*0.05:0),1.1,ud.fallW)*ud.skal;
+    setzeLabel(ud.name,v.position.x,nameY,v.position.z, G.modus!=='menu'&&!versteckt);
+    setzeLabel(ud.effL,v.position.x,nameY+0.55,v.position.z, !!effTxt&&!versteckt&&G.modus==='spiel');
+    setzeLabel(ud.stunL,v.position.x+(liegt?Math.sin(v.rotation.y)*1.2:0),liegt?1.0:2.7,v.position.z+(liegt?Math.cos(v.rotation.y)*1.2:0),(stun||liegt)&&!versteckt);
   }
-  for(const [id,v] of VIEWS.spieler) if(!G.spieler.has(id)){ scene.remove(v); v.userData.name.remove(); v.userData.stunL.remove(); VIEWS.spieler.delete(id); }
+  for(const [id,v] of VIEWS.spieler) if(!G.spieler.has(id)){ scene.remove(v); v.userData.name.remove(); v.userData.stunL.remove(); v.userData.effL.remove(); VIEWS.spieler.delete(id); }
 
   const meV=VIEWS.spieler.get(G.meineId);
   ichRing.visible=!!meV&&G.modus==='spiel';
@@ -1557,7 +1647,7 @@ function syncViews(dt,uhr){
   markRing.visible=!!naechstes;
   if(naechstes){
     markRing.position.x=naechstes.x; markRing.position.z=naechstes.z; markRing.scale.setScalar(1+Math.sin(uhr*6)*0.08);
-    const I=ITEMS[naechstes.typ], zuSchwer=gewicht(me.carry)+I.gewicht>me.kapazitaet;
+    const I=ITEMS[naechstes.typ], zuSchwer=gewicht(me.carry)+I.gewicht>kap(me);
     hintLabel.textContent=`${I.name} · ${I.wert} $ · ${I.gewicht} kg${zuSchwer?' (zu schwer)':''}`;
     setzeLabel(hintLabel,naechstes.x,0.9,naechstes.z);
   } else setzeLabel(hintLabel,0,0,0,false);
@@ -1698,19 +1788,73 @@ function updateHud(dt){
   if(rk!==updateHud.rk){ updateHud.rk=rk; const el=$('rang'); el.innerHTML='';
     rang.forEach(p=>{ const z=document.createElement('div'); z.className='rz'+(p.id===G.meineId?' ich':''); const d=document.createElement('span'); d.className='dot'; d.style.background=hex(p.farbe); const n=document.createElement('span'); n.className='n'; n.textContent=p.name; const g=document.createElement('span'); g.textContent=p.geld+' $'; z.append(d,n,g); el.appendChild(z); }); }
   // Rucksack
-  const ck=me.carry.join(',');
+  const ck=me.carry.join(',')+'|'+kap(me);
   if(ck!==updateHud.ck){ updateHud.ck=ck; const el=$('packItems'); el.innerHTML='';
     me.carry.forEach(t=>{ const c=document.createElement('span'); c.className='chip'; c.style.background=hex(ITEMS[t].farbe); c.textContent=ITEMS[t].name; el.appendChild(c); });
-    const w=gewicht(me.carry); $('packBar').style.width=Math.min(100,w/me.kapazitaet*100)+'%'; $('packBar').classList.toggle('schwer',w/me.kapazitaet>0.7);
-    $('packTxt').textContent=`Rucksack ${w}/${me.kapazitaet} kg${me.carry.length?' · '+me.carry.reduce((s,t)=>s+ITEMS[t].wert,0)+' $':''}`;
+    const w=gewicht(me.carry), K=kap(me); $('packBar').style.width=Math.min(100,w/K*100)+'%'; $('packBar').classList.toggle('schwer',w/K>0.7);
+    $('packTxt').textContent=`Rucksack ${w}/${K} kg${me.carry.length?' · '+me.carry.reduce((s,t)=>s+ITEMS[t].wert,0)+' $':''}`;
     $('btnAb').classList.toggle('hidden',!me.carry.length);
   }
   $('btnAuf').classList.toggle('bereit',!!naechstes);
+  // Laden nur in der Ankauf-Zone
+  const amAnkauf=inZone(me.x,me.z);
+  $('btnLaden').classList.toggle('hidden',!amAnkauf||ladenOffen);
+  if(ladenOffen){ if(!amAnkauf) ladenZu(); else { $('ladenGeld').textContent=`Dein Geld: ${me.geld} $ · Inventar ${me.inventar.length}/${INVENTAR_MAX}`;
+    for(const F of FAEHIGKEITEN) F.btn.disabled = me.geld<F.preis || me.inventar.length>=INVENTAR_MAX; } }
+  // Inventar-Knöpfe
+  const ik=me.inventar.join(',');
+  if(ik!==updateHud.ik){ updateHud.ik=ik; const el=$('slots'); el.innerHTML='';
+    me.inventar.forEach((key,i)=>{ const F=FAEHIGKEITEN.find(f=>f.key===key); if(!F) return;
+      const b=document.createElement('button'); b.className='rund slot'; b.textContent=F.icon; b.title=F.name+' ('+(i+1)+')';
+      const n=document.createElement('span'); n.className='slotNr'; n.textContent=i+1; b.appendChild(n);
+      b.addEventListener('pointerdown',ev=>{ ev.preventDefault(); ev.stopPropagation(); Sound.init(); aktionNutze(i); });
+      el.appendChild(b); }); }
+  // laufende Effekte
+  const et=FAEHIGKEITEN.filter(F=>F.slot>=0&&aktiv(me,F.slot)).map(F=>F.icon+' '+Math.ceil(me.effRest[F.slot])+'s').join('  ');
+  const ef=$('effekte'); if(ef.textContent!==et){ ef.textContent=et; ef.classList.toggle('hidden',!et); }
   $('btnSchubs').classList.toggle('warten',uhr<schubsLokalBereit);
   $('btnSchubs').classList.toggle('bereit',uhr>=schubsLokalBereit&&schubsZiel());
 }
+let ladenOffen=false;
+function ladenAuf(){ const me=ich(); if(G.modus!=='spiel'||!me||!inZone(me.x,me.z)) return; ladenOffen=true; $('laden').classList.remove('hidden'); updateHud(0); }
+function ladenZu(){ ladenOffen=false; $('laden').classList.add('hidden'); }
+(function baueLaden(){
+  const liste=$('ladenListe');
+  for(const F of FAEHIGKEITEN){
+    const z=document.createElement('div'); z.className='ware';
+    const ic=document.createElement('div'); ic.className='wareIcon'; ic.textContent=F.icon;
+    const tx=document.createElement('div'); tx.className='wareText'; const b=document.createElement('b'); b.textContent=F.name; const sm=document.createElement('small'); sm.textContent=F.text; tx.append(b,sm);
+    const bt=document.createElement('button'); bt.className='btn wareBtn'; bt.textContent=F.preis+' $'; bt.onclick=()=>{ Sound.init(); aktionKauf(F.key); };
+    F.btn=bt; z.append(ic,tx,bt); liste.appendChild(z);
+  }
+  $('btnLaden').addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); Sound.init(); ladenAuf(); });
+  $('bLadenZu').onclick=()=>ladenZu();
+})();
+// Rauchwolke über dem Bildschirm (nur bei den anderen Spielern)
+const rauch={bis:0,start:0,puffs:[],cv:$('rauch')}; rauch.ctx=rauch.cv.getContext('2d');
+function starteRauch(dauer){
+  rauch.start=uhr; rauch.bis=uhr+dauer; rauch.puffs=[];
+  const s=Math.max(SW,SH)/700;
+  for(let i=0;i<40;i++) rauch.puffs.push({x:Math.random()*SW,y:Math.random()*SH,r:rnd(80,170)*s,vx:rnd(-14,14),vy:rnd(-10,10),ph:rnd(0,6)});
+  rauch.cv.classList.remove('hidden');
+}
+function zeichneRauch(dt){
+  if(uhr>=rauch.bis){ if(!rauch.cv.classList.contains('hidden')){ rauch.cv.classList.add('hidden'); } return; }
+  const cv=rauch.cv, c=rauch.ctx, d=Math.min(2,window.devicePixelRatio||1);
+  if(cv.width!==Math.floor(SW*d)){ cv.width=Math.floor(SW*d); cv.height=Math.floor(SH*d); }
+  c.setTransform(d,0,0,d,0,0); c.clearRect(0,0,SW,SH);
+  const alpha=Math.min(1,(uhr-rauch.start)/0.35, (rauch.bis-uhr)/2.5);
+  c.globalAlpha=alpha;
+  for(const p of rauch.puffs){ p.x+=p.vx*dt; p.y+=p.vy*dt; }
+  const r=p=>p.r*(1+Math.sin(uhr*1.5+p.ph)*0.06);
+  c.fillStyle='#2a2321'; for(const p of rauch.puffs){ c.beginPath(); c.arc(p.x,p.y,r(p)+4,0,7); c.fill(); }
+  c.fillStyle='#cfcac3'; for(const p of rauch.puffs){ c.beginPath(); c.arc(p.x,p.y,r(p),0,7); c.fill(); }
+  c.fillStyle='#ebe7e1'; for(const p of rauch.puffs){ c.beginPath(); c.arc(p.x-r(p)*0.18,p.y-r(p)*0.2,r(p)*0.78,0,7); c.fill(); }
+  c.globalAlpha=1;
+}
+
 function zeigeSpiel(){
-  zeigeScreen(null); updateHud.rk=updateHud.ck=null;
+  zeigeScreen(null); updateHud.rk=updateHud.ck=updateHud.ik=null; ladenZu(); rauch.bis=0;
   const me=ich(); if(me){ kam.x=me.x; kam.z=me.z; }
   zeigeMsg('LOS GEHT\'S!','gelb','Bring Schrott zum Ankauf',1.8); Sound.start();
   setTimeout(()=>{ const t=$('tipp'); if(t) t.style.opacity='0'; },9000);
@@ -1738,6 +1882,7 @@ function zeigeLobby(){
   $('clientWait').classList.toggle('hidden',G.istHost);
 }
 function zeigeEnde(rang){
+  ladenZu(); rauch.bis=0;
   Sound.ende();
   const liste=rang.map(([id,name,geld,farbe])=>({id,name,geld,farbe}));
   zeigeScreen('ende');
@@ -1753,6 +1898,7 @@ function aufraeumen(){
   VIEWS.spieler.clear(); G.spieler.clear(); G.items.clear();
 }
 function zurueckZumMenu(status=''){
+  ladenZu(); rauch.bis=0;
   G.istHost=true; G.online=false; G.modus='menu';
   Netz.stop(); aufraeumen(); G.meineId='host';
   starteDemo();
@@ -1824,6 +1970,7 @@ function schleife(t){
   updatePopups(echt);
   hudT+=echt; if(hudT>0.08){ updateHud(hudT); hudT=0; }
   postMat.uniforms.zeit.value=Math.floor(uhr*8)/8;
+  zeichneRauch(echt);
   render();
 }
 function simSchritt(dt){
